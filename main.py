@@ -103,9 +103,12 @@ class Sentry(object):
 
 
 def create_branch(project):
-    if project.branches.get("auto_add_sentry"):
+    try:
+        project.branches.get("auto_add_sentry")
         print("branch already exists, deleting")
         project.branches.delete("auto_add_sentry")
+    except:
+        pass
 
     branch = project.branches.create({"branch": "auto_add_sentry", "ref": "master"})
     f = project.files.create(
@@ -131,16 +134,28 @@ export SENTRY_URL=https://sentry.numberly.net/
 
 
 def loop(gl, s):
-    groups = gl.groups.list(search="team-infrastructure")
+    groups = gl.groups.list(search="team-uep")
     for group in groups:
         print("Doing team {}".format(group.full_name))
         sentry_team = s.create_or_get_team(group.full_name)
-        projects = gl.projects.list(namespace=group.id, search="testsentry")
+        projects = gl.projects.list(namespace=group.id, search="mobile-api")
 
         for project in projects:
-            print(project.name)
+            # transform `<group>/<subnamespace1>/<subnamespace2>/<project>` to
+            # <subnamespace1>-<subnamespace2>-<project>
+            project_name = project.path_with_namespace.replace('{}/'.format(group.name),'')
+            project_name_slug = slugify(
+                project.path_with_namespace.replace('{}/'.format(group.name),'')
+            )
+
+            # Initially check if project exists, if yes, append to DONE
+            sentry_project = s.get_project(sentry_team["slug"], project_name_slug)
+            if sentry_project:
+                PROJECTS_DONE.append(project.id)
+
             # We avoid doing useless requests by checking if it's present
-            if project.id in PROJECTS_DONE or project.id in PROJECTS_IGNORE:
+            if project.id in PROJECTS_DONE or \
+               project.id in PROJECTS_IGNORE:
                 continue
 
             print("is there any MR?")
@@ -156,12 +171,12 @@ def loop(gl, s):
             # Else If MR merged but no sentry, we create sentry and post DSN
             elif (
                 len([x for x in mrs if x.state == "merged"])
-                and s.get_project(sentry_team["slug"], slugify(project.name)) is None
+                and sentry_project is None
             ):
                 print("MR merge but no project, lets create it")
                 sentry_project = s.create_or_get_project(
                     sentry_team["slug"],
-                    project.name,
+                    project_name,
                 )
                 print("Sentry project created", sentry_project)
                 clients_keys = s.get_clients_keys(
