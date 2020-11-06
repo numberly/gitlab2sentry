@@ -5,9 +5,9 @@ from slugify import slugify
 import logging
 import time
 
-GITLAB_URL = "https://gitlab.numberly.in"
+GITLAB_URL = os.getenv("GITLAB_URL", "https://gitlab.numberly.in")
 GITLAB_TOKEN = os.getenv("GITLAB_TOKEN")
-SENTRY_URL = "https://sentry.numberly.net"
+SENTRY_URL = os.getenv("SENTRY_URL", "https://sentry.numberly.net")
 SENTRY_TOKEN = os.getenv("SENTRY_TOKEN")
 
 PROJECTS_DONE = []
