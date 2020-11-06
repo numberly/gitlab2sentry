@@ -1,0 +1,39 @@
+global:
+  env: production
+  app: gitlab2sentry
+  namespace: team-infrastructure
+
+secret:
+  gitlab_token: your-vault-gitlab-token-path
+  sentry_token: your-vault-sentry-token-path
+
+cronjob:
+  image: "your-image-registry-path"
+  imagePullPolicy: "IfNotPresent"
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 3
+  activeDeadlineSeconds: 800
+  concurrencyPolicy: "Forbid"
+  startingDeadlineSeconds: 10
+  securityContext:
+    runAsUser: your-user-id
+  jobs:
+    - name: 'gitlab2sentry'
+      schedule: your-crontab-schedule
+      env:
+        - name: GITLAB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: GITLAB_TOKEN
+              name: gitlab2sentry-production
+        - name: SENTRY_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: SENTRY_TOKEN
+              name: gitlab2sentry-production
+        - name: SENTRY_DSN
+          value: your-sentry-dsn
+        - name: SENTRY_URL
+          value: your-sentry-url
+        - name: GITLAB_URL
+          value: your-gitlab-url

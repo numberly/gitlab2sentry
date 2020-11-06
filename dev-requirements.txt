@@ -1,0 +1,12 @@
+-r requirements.txt
+
+black
+flake8
+isort
+mock
+mypy
+pytest
+pytest-mock
+types-python-slugify
+types-PyYAML
+types-requests

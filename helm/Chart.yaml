@@ -1,0 +1,13 @@
+apiVersion: v1
+name: gitlab2sentry
+version: 1.0.1
+description: gitlab2sentry helm chart
+keywords:
+- gitlab
+- sentry
+sources:
+- your-project-source
+maintainers:
+- name: name-of-the-author
+  email: email-of-the-author
+engine: gotpl

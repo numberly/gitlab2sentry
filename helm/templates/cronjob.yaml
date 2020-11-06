@@ -1,0 +1,50 @@
+{{- range .Values.cronjob.jobs -}}
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: "{{ .name }}"
+{{- if $.Values.global.namespace }}
+  namespace: "{{ $.Values.global.namespace }}"
+{{- else }}
+  namespace: "{{ $.Chart.Name }}-{{ $.Values.global.env }}"
+{{- end }}
+  annotations:
+    chart: "{{ $.Chart.Name }}-{{ $.Chart.Version }}"
+spec:
+  schedule: "{{ .schedule }}"
+  concurrencyPolicy: "{{ $.Values.cronjob.concurrencyPolicy }}"
+  successfulJobsHistoryLimit: {{ $.Values.cronjob.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ $.Values.cronjob.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: {{ $.Values.cronjob.activeDeadlineSeconds }}
+      template:
+        spec:
+          {{- if $.Values.cronjob.securityContext }}
+          securityContext:
+{{ toYaml $.Values.cronjob.securityContext | indent 12 }}
+          {{- end }}
+          {{- if $.Values.volumes }}
+          volumes:
+{{ toYaml $.Values.volumes | indent 12 }}
+            {{- end }}
+          containers:
+          - name: {{ .name }}
+            image: "{{ required "The image name must be defined" $.Values.cronjob.image }}:{{ required "The image tag must be defined" $.Values.cronjob.imageTag }}"
+            imagePullPolicy: "IfNotPresent"
+            volumeMounts: {{ toYaml .volumeMounts | nindent 14 }}
+            {{- if .command }}
+            command:
+            - {{ .command }}
+            {{- end }}
+{{- range $arg := .args }}
+            args:
+            - {{ $arg }}
+{{- end }}
+{{- if .env }}
+            env:
+{{ toYaml .env | indent 14 }}
+{{- end }}
+          restartPolicy: OnFailure
+---
+{{- end -}}
