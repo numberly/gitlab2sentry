@@ -141,6 +141,8 @@ def loop(gl, s):
         projects = gl.projects.list(namespace=group.id, search="mobile-api")
 
         for project in projects:
+            if not project.path_with_namespace.startswith('team-'):
+                pass
             # transform `<group>/<subnamespace1>/<subnamespace2>/<project>` to
             # <subnamespace1>-<subnamespace2>-<project>
             project_name = project.path_with_namespace.replace('{}/'.format(group.name),'')
