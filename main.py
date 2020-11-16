@@ -1,10 +1,11 @@
+import logging
 import os
+import re
+import time
+
 import gitlab
 import requests
 from slugify import slugify
-import logging
-import time
-import re
 
 GITLAB_URL = os.getenv("GITLAB_URL", "https://gitlab.numberly.in")
 GITLAB_TOKEN = os.getenv("GITLAB_TOKEN")
@@ -14,13 +15,19 @@ SENTRY_TOKEN = os.getenv("SENTRY_TOKEN")
 PROJECTS_DONE = []
 PROJECTS_IGNORE = []
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(name)s %(levelname)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 
-class Sentry(object):
+
+class Sentry:
     def __init__(self, url, *args, **kwargs):
         self.url = url
         self.token = kwargs["auth_token"]
         self.org_slug = kwargs["org_slug"]
-        self.headers = {"Authorization": u"Bearer {}".format(self.token)}
+        self.headers = {"Authorization": f"Bearer {self.token}"}
 
     def create_or_get_team(self, team):
         team_slug = slugify(team)
@@ -29,9 +36,7 @@ class Sentry(object):
             "slug": team_slug,
         }
         r = requests.post(
-            "{url}/api/0/organizations/{org_slug}/teams/".format(
-                url=self.url, org_slug=self.org_slug
-            ),
+            f"{self.url}/api/0/organizations/{self.org_slug}/teams/",
             headers=self.headers,
             data=data,
         )
@@ -39,26 +44,18 @@ class Sentry(object):
         if r.status_code != 201:
             if r.status_code == 409:
                 r = requests.get(
-                    "{url}/api/0/teams/{org_slug}/{team}/".format(
-                        url=self.url,
-                        org_slug=self.org_slug,
-                        team=team_slug,
-                    ),
+                    f"{self.url}/api/0/teams/{self.org_slug}/{team_slug}/",
                     headers=self.headers,
                 )
                 return r.json()
             return None
 
-        logging.info("Team {team} created!".format(team=team))
+        logging.info(f"team {team} created!")
         return result
 
     def get_project(self, team, project_slug):
         r = requests.get(
-            "{url}/api/0/projects/{org_slug}/{project_slug}/".format(
-                url=self.url,
-                org_slug=self.org_slug,
-                project_slug=project_slug,
-            ),
+            f"{self.url}/api/0/projects/{self.org_slug}/{project_slug}/",
             headers=self.headers,
         )
         if r.status_code != 200:
@@ -72,11 +69,7 @@ class Sentry(object):
             "slug": project_slug,
         }
         r = requests.post(
-            "{url}/api/0/teams/{org_slug}/{team}/projects/".format(
-                url=self.url,
-                org_slug=self.org_slug,
-                team=team,
-            ),
+            f"{self.url}/api/0/teams/{self.org_slug}/{team}/projects/",
             headers=self.headers,
             data=data,
         )
@@ -90,37 +83,33 @@ class Sentry(object):
 
     def get_clients_keys(self, team, project):
         r = requests.get(
-            "{url}/api/0/projects/{org_slug}/{project}/keys/".format(
-                url=self.url,
-                org_slug=self.org_slug,
-                team=team,
-                project=project,
-            ),
+            f"{self.url}/api/0/projects/{self.org_slug}/{project}/keys/",
             headers=self.headers,
         )
         if r.status_code != 200:
             return None
         return r.json()
 
+
 def create_mr(project, branch_name, file_path, content, title, description):
     try:
         project.branches.get(branch_name)
-        print("branch already exists, deleting")
+        logging.info("branch already exists, deleting")
         project.branches.delete(branch_name)
-    except:
+    except Exception:
         pass
 
-    branch = project.branches.create({"branch": branch_name, "ref": "master"})
+    project.branches.create({"branch": branch_name, "ref": "master"})
     try:
-        f = project.files.get(file_path=file_path, ref='master')
+        f = project.files.get(file_path=file_path, ref="master")
         f.content = content
-        f.save(branch=branch_name, commit_message='Udpate .sentryclirc')
-    except:
+        f.save(branch=branch_name, commit_message="Udpate .sentryclirc")
+    except Exception:
         f = project.files.create(
             {
                 "file_path": file_path,
                 "branch": branch_name,
-                "content": u'{}'.format(content),
+                "content": f"{content}",
                 "author_email": "gitlab2sentry@numberly.com",
                 "author_name": "gitlab2sentry",
                 "commit_message": "Update .sentryclirc",
@@ -135,29 +124,30 @@ def create_mr(project, branch_name, file_path, content, title, description):
         }
     )
 
+
 def loop(gl, s):
     groups = gl.groups.list(search="team-")
     for group in groups:
-        print("Doing team {}".format(group.full_name))
-        sentry_team = s.create_or_get_team(group.full_name)
+        logging.info(f"doing team {group.full_name}")
+        s.create_or_get_team(group.full_name)
 
     projects = gl.projects.list(list=False, all=True)
-    for project  in projects:
-        if not project.path_with_namespace.startswith('team-'):
+    for project in projects:
+        if not project.path_with_namespace.startswith("team-"):
             continue
-        if project.path_with_namespace not in toto:
-            continue
+        # FIXME: what is toto?
+        # if project.path_with_namespace not in toto:
+        #    continue
         # transform `<group>/<subnamespace1>/<subnamespace2>/<project>` to
         # <subnamespace1>-<subnamespace2>-<project>
-        match = re.search('(?P<team>team-[a-z]+)/(?P<project>.*)',
-                          project.path_with_namespace)
-
-        group_name = match.group('team')
-        project_name = match.group('project')
-        print(project_name)
-        project_name_slug = slugify(
-            project_name
+        match = re.search(
+            "(?P<team>team-[a-z]+)/(?P<project>.*)", project.path_with_namespace
         )
+
+        group_name = match.group("team")
+        project_name = match.group("project")
+        logging.info(project_name)
+        project_name_slug = slugify(project_name)
 
         # Initially check if project exists, if yes, append to DONE
         sentry_project = s.get_project(group_name, project_name_slug)
@@ -165,52 +155,60 @@ def loop(gl, s):
             PROJECTS_DONE.append(project.id)
 
         # We avoid doing useless requests by checking if it's present
-        if project.id in PROJECTS_DONE or \
-           project.id in PROJECTS_IGNORE:
+        if project.id in PROJECTS_DONE or project.id in PROJECTS_IGNORE:
             continue
 
-        print("is there any MR?")
+        logging.info("is there any MR?")
         mrs = project.mergerequests.list(
             state="all", search="Add sentry to this project"
         )
-        print(mrs)
+        logging.info(mrs)
         # If not MR, we create one
         if not len(mrs):
-            print("no mr, create branch")
-            content = '''## File generated by gitlab2sentry
+            logging.info("no mr, create branch")
+            content = """## File generated by gitlab2sentry
 [defaults]
 url = https://sentry.numberly.net/
-'''
+"""
+            msg = (
+                "@all Merge this and it will automatically create a Sentry project "
+                f"for {project.name_with_namespace} :cookie:"
+            )
             create_mr(
-                project, 'auto_add_sentry', '.sentryclirc',
-                content, "Add sentry to this project",
-                "@all Merge this and it will automatically create a Sentry project  :cookie:",
+                project,
+                "auto_add_sentry",
+                ".sentryclirc",
+                content,
+                "Add sentry to this project",
+                msg,
             )
             continue
         # Else If MR merged but no sentry, we create sentry and post DSN
-        elif (
-            len([x for x in mrs if x.state == "merged"])
-            and sentry_project is None
-        ):
-            print("MR merge but no project, lets create it")
+        elif len([x for x in mrs if x.state == "merged"]) and sentry_project is None:
+            logging.info("MR merge but no project, let's create it")
             sentry_project = s.create_or_get_project(
                 group_name,
                 project_name,
             )
-            print("Sentry project created", sentry_project)
-            clients_keys = s.get_clients_keys(
-                group_name, sentry_project["slug"]
-            )
-            print(clients_keys)
-            content = '''## File generated by gitlab2sentry
+            logging.info("sentry project created", sentry_project)
+            clients_keys = s.get_clients_keys(group_name, sentry_project["slug"])
+            logging.info(clients_keys)
+            content = f"""## File generated by gitlab2sentry
 [defaults]
 url = https://sentry.numberly.net/
-dsn = {}
-'''.format(clients_keys[0]['dsn']['public'])
+dsn = {clients_keys[0]['dsn']['public']}
+"""
+            msg = (
+                "@all Congrats, your Sentry project has been created, merge this "
+                "to finalize your Sentry integration :clap: :cookie:"
+            )
             create_mr(
-                project, 'auto_add_sentry_bis', '.sentryclirc',
-                content, "Finalize your Sentry integration",
-                "@all Congrats, your Sentry project has been created, merge this to finalize your Sentry integration :clap: :cookie:",
+                project,
+                "auto_add_sentry_bis",
+                ".sentryclirc",
+                content,
+                "Finalize your Sentry integration",
+                msg,
             )
             PROJECTS_DONE.append(project.id)
         else:
