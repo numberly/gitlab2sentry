@@ -4,6 +4,7 @@ from collections import Counter, defaultdict
 
 import requests
 from gitlab import Gitlab
+from gitlab.exceptions import GitlabGetError
 from slugify import slugify
 
 GITLAB_URL = os.getenv("GITLAB_URL", "https://gitlab.numberly.in")
@@ -165,6 +166,20 @@ dsn = {dsn}
     )
 
 
+def get_sentryclirc(project):
+    has_file, has_dsn = False, False
+    try:
+        f = project.files.get(file_path=".sentryclirc", ref="master")
+    except GitlabGetError:
+        pass
+    else:
+        has_file = True
+        for line in f.decode().splitlines():
+            if line.startswith(b"dsn"):
+                has_dsn = True
+    return has_file, has_dsn
+
+
 def main():
     # connect to gitlab & sentry
     gitlab = Gitlab(GITLAB_URL, private_token=GITLAB_TOKEN)
@@ -174,7 +189,7 @@ def main():
     # prepare our run variables
     mr_by_project = defaultdict(list)
     mr_counts = Counter()
-    mr_stats = Counter()
+    run_stats = Counter()
 
     # get all the MRs we ever done
     for mr in gitlab.mergerequests.list(all=True, state="all", scope="created_by_me"):
@@ -191,23 +206,34 @@ def main():
 
         # check every project of the group
         for project in group.projects.list(all=True):
-            mr_count = mr_counts[project.id]
-            if mr_count == 0:
-                # no mr ever? let's propose sentry!
+            # skip project if MRs are disabled
+            if not project.merge_requests_enabled:
                 logging.info(
-                    f"project {project.name_with_namespace} needs sentry "
-                    ".sentryclirc MR"
+                    f"project {project.name_with_namespace} does not accept MRs"
                 )
-                mr_stats["mr_proposal"] += 1
-                # TODO: uncomment me
-                # propose_sentry_mr(project)
-            elif mr_count == 1:
-                # one mr already open?
-                mr_merged = mr_by_project[project.id][0].state == "merged"
-                if mr_merged:
-                    # it's been merged!
-                    # let's make sure the sentry project exists
-                    # and open a MR with the project DSN
+                run_stats["mr_disabled"] += 1
+                continue
+
+            # check sentryclirc presence and dsn in the file
+            project = gitlab.projects.get(project.id)
+            has_sentryclirc, has_dsn = get_sentryclirc(project)
+            logging.info(
+                f"project {project.name_with_namespace} "
+                f"has_sentryclirc={has_sentryclirc} "
+                f"has_dsn={has_dsn}"
+            )
+            # both sentryclirc and dsn ? we're done here
+            if has_sentryclirc and has_dsn:
+                run_stats["has_sentry_dsn"] += 1
+                continue
+
+            # sentryclirc but no dsn ? check for pending MR
+            elif has_sentryclirc and not has_dsn:
+                for mr in mr_by_project[project.id]:
+                    if mr.state == "open":
+                        run_stats["mr_dsn_waiting"] += 1
+                        break
+                else:
                     logging.info(
                         f"creating sentry project {project.name_with_namespace}"
                     )
@@ -228,19 +254,27 @@ def main():
                     )
                     # TODO: uncomment me
                     # add_sentry_dsn_mr(project, dsn)
-                    mr_stats["mr_dsn"] += 1
-                    continue
-                logging.info(
-                    f"project {project.name_with_namespace} is pending MR action"
-                )
-                mr_stats["mr_waiting"] += 1
-            elif mr_count > 1:
-                # we opened multiple sentry MRs already, skip it
-                logging.info(
-                    f"project {project.name_with_namespace} has been handled, skipping"
-                )
-                mr_stats["mr_done"] += 1
-    logging.info(f"run stats: {dict(mr_stats)}")
+                    run_stats["mr_dsn_created"] += 1
+
+            elif not has_sentryclirc:
+                for mr in mr_by_project[project.id]:
+                    if mr.state == "open":
+                        logging.info(
+                            f"project {project.name_with_namespace} has a "
+                            "pending sentryclirc MR"
+                        )
+                        run_stats["mr_sentryclirc_waiting"] += 1
+                        break
+                else:
+                    logging.info(
+                        f"project {project.name_with_namespace} needs sentry "
+                        ".sentryclirc MR"
+                    )
+                    run_stats["mr_sentryclirc_created"] += 1
+                    # TODO: uncomment me
+                    # propose_sentry_mr(project)
+
+    logging.info(f"run stats: {dict(run_stats)}")
 
 
 if __name__ == "__main__":
