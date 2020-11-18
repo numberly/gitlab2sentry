@@ -285,7 +285,15 @@ def main():
                         ".sentryclirc MR"
                     )
                     run_stats["mr_sentryclirc_created"] += 1
-                    propose_sentry_mr(project)
+                    try:
+                        propose_sentry_mr(project)
+                    except Exception as err:
+                        sentry_sdk.capture_exception(err)
+                        logging.error(
+                            f"project {project.name_with_namespace} failed to "
+                            f"create the .sentryclirc MR ({err})"
+                        )
+
 
     logging.info(f"run stats: {dict(run_stats)}")
 
