@@ -3,6 +3,7 @@ import os
 from collections import Counter, defaultdict
 
 import requests
+import sentry_sdk
 from gitlab import Gitlab
 from gitlab.exceptions import GitlabGetError
 from slugify import slugify
@@ -104,20 +105,21 @@ def create_mr(project, branch_name, file_path, content, title, description):
     except Exception:
         f = project.files.create(
             {
-                "file_path": file_path,
-                "branch": branch_name,
-                "content": f"{content}",
                 "author_email": "gitlab2sentry@numberly.com",
                 "author_name": "gitlab2sentry",
+                "branch": branch_name,
                 "commit_message": "Update .sentryclirc",
+                "content": f"{content}",
+                "file_path": file_path,
             }
         )
     project.mergerequests.create(
         {
+            "description": description,
+            "remove_source_branch": True,
             "source_branch": branch_name,
             "target_branch": "master",
             "title": title,
-            "description": description,
         }
     )
 
@@ -205,7 +207,7 @@ def main():
         ensure_sentry_team(group.full_name, sentry)
 
         # check every project of the group
-        for project in group.projects.list(all=True):
+        for project in group.projects.list(all=True, archived=False):
             # skip project if MRs are disabled
             if not project.merge_requests_enabled:
                 logging.info(
@@ -217,53 +219,65 @@ def main():
             # check sentryclirc presence and dsn in the file
             project = gitlab.projects.get(project.id)
             has_sentryclirc, has_dsn = get_sentryclirc(project)
-            logging.info(
+            logging.debug(
                 f"project {project.name_with_namespace} "
                 f"has_sentryclirc={has_sentryclirc} "
                 f"has_dsn={has_dsn}"
             )
             # both sentryclirc and dsn ? we're done here
             if has_sentryclirc and has_dsn:
+                logging.info(
+                    f"project {project.name_with_namespace} has a sentry project "
+                )
                 run_stats["has_sentry_dsn"] += 1
                 continue
 
             # sentryclirc but no dsn ? check for pending MR
             elif has_sentryclirc and not has_dsn:
                 for mr in mr_by_project[project.id]:
-                    if mr.state == "open":
+                    if mr.state == "opened":
+                        logging.info(
+                            f"project {project.name_with_namespace} has a "
+                            "pending dsn MR"
+                        )
                         run_stats["mr_dsn_waiting"] += 1
                         break
                 else:
                     logging.info(
                         f"creating sentry project {project.name_with_namespace}"
                     )
-                    # TODO: uncomment me
-                    # sentry_project = sentry.create_or_get_project(
-                    #    group.full_name,
-                    #    project.name,
-                    # )
-                    # clients_keys = sentry.get_clients_keys(
-                    #    group.full_name, sentry_project["slug"]
-                    # )
-                    # dsn = clients_keys[0]["dsn"]["public"]
-                    # logging.info(
-                    #    f"project {project.name_with_namespace} sentry dsn: {dsn}"
-                    # )
+                    sentry_project = sentry.create_or_get_project(
+                        group.full_name,
+                        project.name,
+                    )
+                    clients_keys = sentry.get_clients_keys(
+                        group.full_name, sentry_project["slug"]
+                    )
+                    dsn = clients_keys[0]["dsn"]["public"]
+                    logging.info(
+                        f"project {project.name_with_namespace} sentry dsn: {dsn}"
+                    )
                     logging.info(
                         f"project {project.name_with_namespace} needs sentry dsn MR"
                     )
-                    # TODO: uncomment me
-                    # add_sentry_dsn_mr(project, dsn)
+                    add_sentry_dsn_mr(project, dsn)
                     run_stats["mr_dsn_created"] += 1
 
             elif not has_sentryclirc:
                 for mr in mr_by_project[project.id]:
-                    if mr.state == "open":
+                    if mr.state == "opened":
                         logging.info(
                             f"project {project.name_with_namespace} has a "
                             "pending sentryclirc MR"
                         )
                         run_stats["mr_sentryclirc_waiting"] += 1
+                        break
+                    elif mr.state == "closed":
+                        logging.info(
+                            f"project {project.name_with_namespace} declined "
+                            "our sentryclirc MR"
+                        )
+                        run_stats["mr_sentryclirc_closed"] += 1
                         break
                 else:
                     logging.info(
@@ -271,11 +285,15 @@ def main():
                         ".sentryclirc MR"
                     )
                     run_stats["mr_sentryclirc_created"] += 1
-                    # TODO: uncomment me
-                    # propose_sentry_mr(project)
+                    propose_sentry_mr(project)
 
     logging.info(f"run stats: {dict(run_stats)}")
 
 
 if __name__ == "__main__":
+    sentry_sdk.init(
+        debug=False,
+        dsn="https://7dbff29bc3e049829ba89831c20fa21e@sentry.numberly.net/64",
+        environment="production",
+    )
     main()
