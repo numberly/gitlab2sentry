@@ -200,8 +200,12 @@ def main():
             mr_by_project[mr.project_id].append(mr)
 
     # loop for all team gitlab groups
-    groups = gitlab.groups.list(search="team-")
+    groups = gitlab.groups.list(all=True, include_subgroups=True)
     for group in groups:
+        # we are only interested in team groups
+        if not group.full_name.startswith("team-"):
+            continue
+
         # ensure each gitlab group has a sentry sibling
         logging.debug(f"handling gitlab group {group.full_name}")
         ensure_sentry_team(group.full_name, sentry)
