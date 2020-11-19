@@ -200,6 +200,7 @@ def main():
             mr_by_project[mr.project_id].append(mr)
 
     # loop for all team gitlab groups
+    sentry_groups = set()
     groups = gitlab.groups.list(all=True, include_subgroups=True)
     for group in groups:
         # we are only interested in team groups
@@ -209,7 +210,9 @@ def main():
 
         # ensure each gitlab group has a sentry sibling
         logging.debug(f"handling gitlab group {group.full_name}")
-        ensure_sentry_team(sentry_group_name, sentry)
+        if sentry_group_name not in sentry_groups:
+            ensure_sentry_team(sentry_group_name, sentry)
+            sentry_groups.add(sentry_group_name)
 
         # check every project of the group
         for project in group.projects.list(all=True, archived=False):
@@ -298,7 +301,6 @@ def main():
                             f"project {project.name_with_namespace} failed to "
                             f"create the .sentryclirc MR ({err})"
                         )
-
 
     logging.info(f"run stats: {dict(run_stats)}")
 
