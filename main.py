@@ -205,10 +205,11 @@ def main():
         # we are only interested in team groups
         if not group.full_name.startswith("team-"):
             continue
+        sentry_group_name = group.full_name.split("/")[0].strip()
 
         # ensure each gitlab group has a sentry sibling
         logging.debug(f"handling gitlab group {group.full_name}")
-        ensure_sentry_team(group.full_name, sentry)
+        ensure_sentry_team(sentry_group_name, sentry)
 
         # check every project of the group
         for project in group.projects.list(all=True, archived=False):
@@ -251,11 +252,11 @@ def main():
                         f"creating sentry project {project.name_with_namespace}"
                     )
                     sentry_project = sentry.create_or_get_project(
-                        group.full_name,
+                        sentry_group_name,
                         project.name,
                     )
                     clients_keys = sentry.get_clients_keys(
-                        group.full_name, sentry_project["slug"]
+                        sentry_group_name, sentry_project["slug"]
                     )
                     dsn = clients_keys[0]["dsn"]["public"]
                     logging.info(
