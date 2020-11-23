@@ -1,0 +1,29 @@
+global:
+  env: production
+  app: gitlab2sentry
+  namespace: team-infrastructure
+
+cronjob:
+  image: "registry.numberly.in/team-infrastructure/gitlab2sentry"
+  imagePullPolicy: "IfNotPresent"
+  imageTag: "0.2"
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: "Forbid"
+  startingDeadlineSeconds: 10
+  securityContext:
+    runAsUser: 65534 # nobody
+  jobs:
+    - name: 'gitlab2sentry'
+      schedule: '*/15 * * * *'
+      env:
+        - name: GITLAB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: GITLAB_TOKEN
+              name: gitlab2sentry-production
+        - name: SENTRY_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: GITLAB_TOKEN
+              name: gitlab2sentry-production
