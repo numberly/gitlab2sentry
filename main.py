@@ -61,7 +61,7 @@ class Sentry:
         return r.json()
 
     def create_or_get_project(self, team, project):
-        project_slug = slugify(project)
+        project_slug = slugify(project).lower()
         data = {
             "name": project,
             "slug": project_slug,
