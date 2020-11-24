@@ -75,7 +75,7 @@ class Sentry:
         if r.status_code != 201:
             if r.status_code == 409:
                 return self.get_project(team, project_slug)
-            return None
+            raise Exception(result)
 
         return result
 
@@ -254,10 +254,17 @@ def main():
                     logging.info(
                         f"creating sentry project {project.name_with_namespace}"
                     )
-                    sentry_project = sentry.create_or_get_project(
-                        sentry_group_name,
-                        project.name,
-                    )
+                    try:
+                        sentry_project = sentry.create_or_get_project(
+                            sentry_group_name,
+                            project.name,
+                        )
+                    except Exception as err:
+                        logging.warning(
+                            f"project {project.name_with_namespace} failed to "
+                            f"get/create its sentry project ({err})"
+                        )
+                        continue
                     clients_keys = sentry.get_clients_keys(
                         sentry_group_name, sentry_project["slug"]
                     )
@@ -296,8 +303,7 @@ def main():
                     try:
                         propose_sentry_mr(project)
                     except Exception as err:
-                        sentry_sdk.capture_exception(err)
-                        logging.error(
+                        logging.warning(
                             f"project {project.name_with_namespace} failed to "
                             f"create the .sentryclirc MR ({err})"
                         )
