@@ -25,5 +25,5 @@ cronjob:
         - name: SENTRY_TOKEN
           valueFrom:
             secretKeyRef:
-              key: GITLAB_TOKEN
+              key: SENTRY_TOKEN
               name: gitlab2sentry-production
