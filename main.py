@@ -251,10 +251,10 @@ def main():
                         run_stats["mr_dsn_waiting"] += 1
                         break
                 else:
-                    sentry_project_name = "-".join(project.path_with_namespace.split("/")[1:])
-                    logging.info(
-                        f"creating sentry project {sentry_project_name}"
+                    sentry_project_name = "-".join(
+                        project.path_with_namespace.split("/")[1:]
                     )
+                    logging.info(f"creating sentry project {sentry_project_name}")
                     try:
                         sentry_project = sentry.create_or_get_project(
                             sentry_group_name,
