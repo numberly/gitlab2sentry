@@ -251,13 +251,14 @@ def main():
                         run_stats["mr_dsn_waiting"] += 1
                         break
                 else:
+                    sentry_project_name = "-".join(project.path_with_namespace.split("/")[1:])
                     logging.info(
-                        f"creating sentry project {project.name_with_namespace}"
+                        f"creating sentry project {sentry_project_name}"
                     )
                     try:
                         sentry_project = sentry.create_or_get_project(
                             sentry_group_name,
-                            project.name,
+                            sentry_project_name,
                         )
                     except Exception as err:
                         logging.warning(
