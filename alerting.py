@@ -291,6 +291,11 @@ def test_alert_config(alerts, teams, group, project_name, sentry):
                         return False
                 else:
                     alert["interval"] = RULES[atype]["interval"]
+            # Get existing dev environnements set in the project
+            environments = sentry.get_project_environments(project_name)
+            for env in environments:
+                if 'production' in env.get('name'):
+                    alert["environment"] = env.get('name')
         else:
             return False
     return alerts
