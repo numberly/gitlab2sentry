@@ -16,10 +16,12 @@ GITLAB_TOKEN='sup3rs3cr3t' SENTRY_TOKEN='m0r3sup3rs3cr3t' make run
 
 ```
 [alert.new_issue]
-notify = team-uep-back
+notify = team-uep-back #optional
+environment = production #optional
 
 [alert.issue_interval]
-notify = team-uep-back
-seen = 100
-interval = 1h
+notify = team-uep-back #optional
+seen = 100 #optional
+interval = 1h #optional
+environment = staging #optional
 ```
