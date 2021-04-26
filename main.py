@@ -136,7 +136,9 @@ url = https://sentry.numberly.net/
 """
     msg = (
         "@all Merge this and it will automatically create a Sentry project "
-        f"for {project.name_with_namespace} :cookie:"
+        f"for {project.name_with_namespace} :cookie: "
+        "https://pages.numberly.in/numberly/handbook/Numberly/Software/"
+        "Sentry%20at%20numberly/#step-1-create-a-gitlab-project-and-get-a-mr"
     )
     create_mr(
         project,
@@ -157,6 +159,8 @@ dsn = {dsn}
     msg = (
         "@all Congrats, your Sentry project has been created, merge this "
         "to finalize your Sentry integration :clap: :cookie:"
+        "https://pages.numberly.in/numberly/handbook/Numberly/Software/"
+        "Sentry%20at%20numberly/#step-1-create-a-gitlab-project-and-get-a-mr"
     )
     create_mr(
         project,
