@@ -16,14 +16,8 @@ boumbo:
 build: switch-env
 	docker build -t $(IMG):$(TAG) .
 
-build_alerting: switch-env
-	docker build -f Dockerfile_alerting -t $(IMG)-alerting:$(TAG) .
-
 push: build
 	docker push $(IMG):$(TAG)
-
-push_alerting: build_alerting
-	docker push $(IMG)-alerting:$(TAG)
 
 qa:
 	isort --profile black . && black . && flake8
@@ -32,12 +26,5 @@ run:
 	# needed env: GITLAB_TOKEN + SENTRY_TOKEN
 	python3 main.py
 
-run_alerting:
-	# needed env: GITLAB_TOKEN + SENTRY_TOKEN
-	python3 alerting.py
-
 upgrade: push
 	helm -n team-infrastructure upgrade -f helm/values-production.yaml gitlab2sentry ./helm
-
-upgrade_alerting: push_alerting
-	helm -n team-infrastructure upgrade -f helm/alerting-values-production.yaml gitlab2sentry-alerting ./helm
