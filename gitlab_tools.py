@@ -39,19 +39,6 @@ class GitlabTools:
             }
         )
 
-    # def get_sentryclirc(project):
-    #     has_file, has_dsn = False, False
-    #     try:
-    #         f = project.files.get(file_path=".sentryclirc", ref="master")
-    #     except GitlabGetError:
-    #         pass
-    #     else:
-    #         has_file = True
-    #         for line in f.decode().splitlines():
-    #             if line.startswith(b"dsn"):
-    #                 has_dsn = True
-    #     return has_file, has_dsn
-
     def get_sentryclirc(project, interval="issue_interval"):
         has_file, has_dsn, sentryclirc = False, False, False
         alerts = []
