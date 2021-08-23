@@ -3,7 +3,7 @@ PRJ	?= gitlab2sentry
 REG ?= registry.numberly.in
 NS	?= team-infrastructure
 IMG	?= $(REG)/$(NS)/$(PRJ)
-TAG	?= $(shell grep ref .git/HEAD | sed 's@.*/\(.*\)@\1@g')
+TAG	?= $(shell git describe --tags)
 
 switch-env:
 	make boumbo
@@ -27,4 +27,4 @@ run:
 	python3 main.py
 
 upgrade: push
-	helm -n team-infrastructure upgrade -f helm/values-production.yaml gitlab2sentry ./helm
+	helm -n team-infrastructure upgrade -f helm/values-production.yaml --set cronjob.imageTag=$(TAG) gitlab2sentry ./helm
