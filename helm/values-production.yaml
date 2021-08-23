@@ -6,7 +6,7 @@ global:
 cronjob:
   image: "registry.numberly.in/team-infrastructure/gitlab2sentry"
   imagePullPolicy: "IfNotPresent"
-  imageTag: "0.4"
+  imageTag: "0.5"
   successfulJobsHistoryLimit: 5
   failedJobsHistoryLimit: 3
   activeDeadlineSeconds: 800
