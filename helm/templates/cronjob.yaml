@@ -45,6 +45,6 @@ spec:
             env:
 {{ toYaml .env | indent 14 }}
 {{- end }}
-          restartPolicy: Never
+          restartPolicy: OnFailure
 ---
 {{- end -}}
