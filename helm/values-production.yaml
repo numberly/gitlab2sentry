@@ -9,6 +9,7 @@ cronjob:
   imageTag: "0.4"
   successfulJobsHistoryLimit: 5
   failedJobsHistoryLimit: 3
+  activeDeadlineSeconds: 600
   concurrencyPolicy: "Forbid"
   startingDeadlineSeconds: 10
   securityContext:

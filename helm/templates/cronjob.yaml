@@ -15,6 +15,7 @@ spec:
   concurrencyPolicy: "{{ $.Values.cronjob.concurrencyPolicy }}"
   successfulJobsHistoryLimit: {{ $.Values.cronjob.successfulJobsHistoryLimit }}
   failedJobsHistoryLimit: {{ $.Values.cronjob.failedJobsHistoryLimit }}
+  activeDeadlineSeconds: {{ $.Values.cronjob.activeDeadlineSeconds }}
   jobTemplate:
     spec:
       template:
@@ -31,7 +32,7 @@ spec:
           - name: {{ .name }}
             image: "{{ required "The image name must be defined" $.Values.cronjob.image }}:{{ required "The image tag must be defined" $.Values.cronjob.imageTag }}"
             imagePullPolicy: "IfNotPresent"
-            volumeMounts: {{ toYaml .volumeMounts | nindent 14 }}              
+            volumeMounts: {{ toYaml .volumeMounts | nindent 14 }}
             {{- if .command }}
             command:
             - {{ .command }}
