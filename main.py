@@ -216,6 +216,7 @@ def main():
     issue_by_project = defaultdict(list)
     issue_counts = Counter()
     run_stats = Counter()
+    yesterday = datetime.utcnow() - timedelta(hours=24)
 
     # get all the MRs we ever done
     logging.info("Getting all MR")
@@ -257,6 +258,17 @@ def main():
                     f"project {project.name_with_namespace} does not accept MRs"
                 )
                 run_stats["mr_disabled"] += 1
+                continue
+
+            # we will only run on projects which changed within 24H
+            if (
+                datetime.fromisoformat(project.last_activity_at.replace("Z", ""))
+                < yesterday
+            ):
+                logging.info(
+                    f"project {project.name_with_namespace} skipped due to last"
+                    f" activity being {project.last_activity_at}"
+                )
                 continue
 
             # check sentryclirc presence and dsn in the file
