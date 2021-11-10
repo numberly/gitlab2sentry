@@ -98,9 +98,9 @@ def create_mr(project, branch_name, file_path, content, title, description):
     except Exception:
         pass
 
-    project.branches.create({"branch": branch_name, "ref": "master"})
+    project.branches.create({"branch": branch_name, "ref": project.default_branch})
     try:
-        f = project.files.get(file_path=file_path, ref="master")
+        f = project.files.get(file_path=file_path, ref=project.default_branch)
         f.content = content
         f.save(branch=branch_name, commit_message="Udpate .sentryclirc")
     except Exception:
@@ -119,7 +119,7 @@ def create_mr(project, branch_name, file_path, content, title, description):
             "description": description,
             "remove_source_branch": True,
             "source_branch": branch_name,
-            "target_branch": "master",
+            "target_branch": project.default_branch,
             "title": title,
         }
     )
@@ -172,7 +172,7 @@ dsn = {dsn}
 def get_sentryclirc(project):
     has_file, has_dsn = False, False
     try:
-        f = project.files.get(file_path=".sentryclirc", ref="master")
+        f = project.files.get(file_path=".sentryclirc", ref=project.default_branch)
     except GitlabGetError:
         pass
     else:
