@@ -25,7 +25,7 @@ class Sentry:
                 }
             ],
             "conditions": [{"id": rule["type"]}],
-            "filters": [],
+            "filters": rule["filters"],
             "name": rule["name"],
             "frequency": frequency,
         }
