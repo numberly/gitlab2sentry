@@ -243,10 +243,7 @@ def main():
         # we are only interested in team groups
         if not group.full_name.startswith("team-"):
             continue
-        # FIXME: TEST Remove here after - testing only
-        if group.id != 1270:
-            continue
-        # FIXME: TEST Remove here above - testing only
+        team-uep = group.full_name.startswith("team-uep")
         sentry_group_name = group.full_name.split("/")[0].strip()
         # ensure each gitlab group has a sentry sibling
         logging.debug(f"handling gitlab group {group.full_name}")
@@ -357,7 +354,7 @@ def main():
                             f"create the .sentryclirc MR ({err})"
                         )
             # CASE 3 : sentryclirc, dsn but no alerting set
-            elif has_sentryclirc and has_dsn and not alerts:
+            elif team-uep and has_sentryclirc and has_dsn and not alerts:
                 logging.info(
                     f"project {project.name_with_namespace} : no alerting "
                     "config detected"
@@ -409,7 +406,7 @@ def main():
                             )
 
             # CASE 4 : all is set
-            elif has_sentryclirc and has_dsn and alerts:
+            elif team-uep and has_sentryclirc and has_dsn and alerts:
                 logging.info(
                     f"project {project.name_with_namespace} : alerting config detected"
                 )
