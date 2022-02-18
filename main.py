@@ -28,6 +28,20 @@ class Sentry:
         self.org_slug = kwargs["org_slug"]
         self.headers = {"Authorization": f"Bearer {self.token}"}
 
+    def get_projects(self):
+        next = None
+        url = f"{self.url}/api/0/projects/"
+        while True:
+            r = requests.get(
+                url,
+                headers=self.headers,
+            )
+            yield r.json()
+            if r.links["next"]["results"] == "true":
+                url = r.links["next"]["url"]
+            else:
+                break
+
     def create_or_get_team(self, team):
         team_slug = slugify(team)
         data = {
@@ -84,6 +98,18 @@ class Sentry:
         r = requests.get(
             f"{self.url}/api/0/projects/{self.org_slug}/{project}/keys/",
             headers=self.headers,
+        )
+        if r.status_code != 200:
+            return None
+        return r.json()
+
+    def set_rate_limit_for_key(self, project, key):
+        data = {"rateLimit": {"window": 60, "count": 300}}
+        url = f"{self.url}/api/0/projects/{self.org_slug}/{project}/keys/{key}/"
+        r = requests.put(
+            f"{self.url}/api/0/projects/{self.org_slug}/{project}/keys/{key}/",
+            headers=self.headers,
+            json=data,
         )
         if r.status_code != 200:
             return None
@@ -283,6 +309,9 @@ def main():
                         sentry_group_name, sentry_project["slug"]
                     )
                     dsn = clients_keys[0]["dsn"]["public"]
+                    # setup ratelimit for key
+                    key_id = clients_keys[0]["id"]
+                    sentry.set_rate_limit_for_key(sentry_project["slug"], key_id)
                     logging.info(
                         f"project {project.name_with_namespace} sentry dsn: {dsn}"
                     )
