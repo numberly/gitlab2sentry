@@ -9,10 +9,11 @@ from gitlab import Gitlab
 from gitlab.exceptions import GitlabGetError
 from slugify import slugify
 
-GITLAB_URL = os.getenv("GITLAB_URL", "https://gitlab.numberly.in")
+GITLAB_URL = os.getenv("GITLAB_URL")
 GITLAB_TOKEN = os.getenv("GITLAB_TOKEN")
-SENTRY_URL = os.getenv("SENTRY_URL", "https://sentry.numberly.net")
+SENTRY_URL = os.getenv("SENTRY_URL")
 SENTRY_TOKEN = os.getenv("SENTRY_TOKEN")
+SENTRY_DSN = os.getenv("SENTRY_DSN")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -304,6 +305,7 @@ def main():
                             f"project {project.name_with_namespace} failed to "
                             f"get/create its sentry project ({err})"
                         )
+                        sentry_sdk.capture_exception(err)
                         continue
                     clients_keys = sentry.get_clients_keys(
                         sentry_group_name, sentry_project["slug"]
@@ -350,6 +352,7 @@ def main():
                             f"project {project.name_with_namespace} failed to "
                             f"create the .sentryclirc MR ({err})"
                         )
+                        sentry_sdk.capture_exception(err)
 
     logging.info(f"run stats: {dict(run_stats)}")
 
@@ -357,7 +360,7 @@ def main():
 if __name__ == "__main__":
     sentry_sdk.init(
         debug=False,
-        dsn="https://7dbff29bc3e049829ba89831c20fa21e@sentry.numberly.net/64",
+        dsn=SENTRY_DSN,
         environment="production",
     )
     main()
