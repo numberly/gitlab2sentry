@@ -1,0 +1,2 @@
+class InvalidYamlConfigError(Exception):
+    pass
