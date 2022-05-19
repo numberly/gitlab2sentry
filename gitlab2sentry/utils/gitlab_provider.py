@@ -1,5 +1,5 @@
 import logging
-from typing import Any, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from gitlab import Gitlab
 from gitlab.exceptions import GitlabGetError
@@ -8,7 +8,7 @@ from gitlab.v4.objects import Group, Project, ProjectMergeRequest
 from gitlab2sentry.resources import (
     DSN_MR_CONTENT,
     DSN_MR_DESCRIPTION,
-    DSN_MR_MSG,
+    DSN_MR_BRANCH_NAME,
     DSN_MR_TITLE,
     GITLAB_AUTHOR_EMAIL,
     GITLAB_AUTHOR_NAME,
@@ -21,7 +21,7 @@ from gitlab2sentry.resources import (
     SENTRYCLIRC_FILEPATH,
     SENTRYCLIRC_MR_CONTENT,
     SENTRYCLIRC_MR_DESCRIPTION,
-    SENTRYCLIRC_MR_MSG,
+    SENTRYCLIRC_BRANCH_NAME,
     SENTRYCLIRC_MR_TITLE,
 )
 
@@ -35,7 +35,7 @@ class GitlabProvider:
     def __str__(self):
         return "<GitlabProvider>"
 
-    def _get_gitlab(self, url: str, token: str) -> Gitlab:
+    def _get_gitlab(self, url: Optional[str], token: Optional[str]) -> Gitlab:
         gitlab = Gitlab(url, private_token=token)
         gitlab.auth()
         return gitlab
@@ -83,7 +83,7 @@ class GitlabProvider:
                 }
             )
 
-    def _get_mr_msg(self, msg: str, name_with_namespace: str) -> Tuple[str, str]:
+    def _get_mr_msg(self, msg: str, name_with_namespace: str) -> tuple:
         return tuple(
             [
                 line.format(
@@ -101,10 +101,10 @@ class GitlabProvider:
         file_path: str,
         content: str,
         title: str,
-        description: str,
+        description: tuple,
     ) -> None:
         self._get_or_create_branch(branch_name, project)
-        self._get_or_create_sentryclirc(self, project, branch_name, file_path, content)
+        self._get_or_create_sentryclirc(project, branch_name, file_path, content)
         project.mergerequests.create(
             {
                 "description": description,
@@ -118,21 +118,21 @@ class GitlabProvider:
     def create_sentryclirc_mr(self, project: Project) -> None:
         self._create_mr(
             project,
-            SENTRYCLIRC_MR_TITLE,
+            SENTRYCLIRC_BRANCH_NAME,
             SENTRYCLIRC_FILEPATH,
             SENTRYCLIRC_MR_CONTENT.format(sentry_url=SENTRY_URL),
-            SENTRYCLIRC_MR_DESCRIPTION.format(project.name),
-            self._get_mr_msg(SENTRYCLIRC_MR_MSG),
+            SENTRYCLIRC_MR_TITLE.format(project.name),
+            self._get_mr_msg(SENTRYCLIRC_MR_DESCRIPTION, project.name_with_namespace),
         )
 
     def create_dsn_mr(self, project: Project, dsn: str) -> None:
         self._create_mr(
             project,
-            DSN_MR_TITLE,
+            DSN_MR_BRANCH_NAME,
             SENTRYCLIRC_FILEPATH,
             DSN_MR_CONTENT.format(sentry_url=SENTRY_URL, dsn=dsn),
-            DSN_MR_DESCRIPTION.format(project_name=project.name),
-            self._get_mr_msg(DSN_MR_MSG),
+            DSN_MR_TITLE.format(project_name=project.name),
+            self._get_mr_msg(DSN_MR_DESCRIPTION,  project.name_with_namespace),
         )
 
     def get_sentryclirc(self, project_id: int) -> Tuple[bool, bool]:

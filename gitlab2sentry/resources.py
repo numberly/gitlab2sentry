@@ -20,13 +20,13 @@ SENTRY_ORG_SLUG = config["sentry"]["slug"]
 
 # DSN MR configuration.
 DSN_MR_CONTENT = config["gitlab"]["dsn_mr"]["content"]
-DSN_MR_MSG = config["gitlab"]["dsn_mr"]["message"]
+DSN_MR_BRANCH_NAME = config["gitlab"]["dsn_mr"]["branch_name"]
 DSN_MR_TITLE = config["gitlab"]["dsn_mr"]["title"]
 DSN_MR_DESCRIPTION = config["gitlab"]["dsn_mr"]["description"]
 
 # Sentryclirc MR configuration.
 SENTRYCLIRC_MR_CONTENT = config["gitlab"]["sentryclirc_mr"]["content"]
-SENTRYCLIRC_MR_MSG = config["gitlab"]["sentryclirc_mr"]["message"]
+SENTRYCLIRC_BRANCH_NAME = config["gitlab"]["sentryclirc_mr"]["branch_name"]
 SENTRYCLIRC_MR_TITLE = config["gitlab"]["sentryclirc_mr"]["title"]
 SENTRYCLIRC_FILEPATH = config["gitlab"]["sentryclirc_mr"]["filepath"]
 SENTRYCLIRC_COM_MSG = config["gitlab"]["sentryclirc_mr"]["commit_message"]

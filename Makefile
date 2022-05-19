@@ -22,6 +22,9 @@ push: build
 qa:
 	isort --profile black . && black . && flake8
 
+mypy:
+	mypy gitlab2sentry/ --config-file .mypy.ini --ignore-missing-imports
+
 run:
 	# needed env: GITLAB_TOKEN + SENTRY_TOKEN
 	python3 gitlab2sentry/run.py

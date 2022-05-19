@@ -5,10 +5,14 @@ chardet==3.0.4
 flake8==4.0.1
 idna==2.10
 isort==5.10.1
+mypy==0.950.0
 python-gitlab==2.5.0
 pyyaml==6.0.0
 regex==2020.10.28
 requests==2.24.0
 sentry-sdk==0.19.5
+types-python-slugify==5.0.4
+types-PyYAML==6.0.7
+types-requests==2.27.27
 Unidecode==0.4.21
 urllib3==1.25.11

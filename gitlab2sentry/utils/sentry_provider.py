@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Generator, Optional, Tuple
 
 import requests
 from requests import Response
@@ -10,23 +10,23 @@ from gitlab2sentry.exceptions import (
     SentryProjectCreationFailed,
     SentryProjectKeyIDNotFound,
 )
-from gitlab2sentry.resources import SENTRY_URL
+from gitlab2sentry.resources import SENTRY_TOKEN, SENTRY_URL
 
 
 class SentryAPIClient:
     def __init__(
         self,
-        token: str,
-        base_url: Optional[str] = SENTRY_URL,
+        token: str = None,
+        base_url: str = None,
     ):
         self.base_url = base_url
         self.url = "{}/api/0/{}"
         self.headers = {"Authorization": f"Bearer {token}"}
 
-    def __str__() -> str:
+    def __str__(self) -> str:
         return "<SentryAPIClient>"
 
-    def _get_json(self, response: Response) -> Optional[Dict[str, Any]]:
+    def _get_json(self, response: Response) -> Tuple[int, Any]:
         try:
             return response.status_code, response.json()
         except json.JSONDecodeError as json_error:
@@ -42,7 +42,7 @@ class SentryAPIClient:
         method: str,
         suffix: Optional[str] = None,
         data: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+    ) -> Tuple[int, Any]:
         url = self.url.format(self.base_url, suffix)
         logging.debug("{} simple {} request to {}".format(self.__str__(), method, url))
         if method == "post":
@@ -52,7 +52,7 @@ class SentryAPIClient:
         else:
             return self._get_json(requests.get(url, headers=self.headers))
 
-    def page_request(self, suffix: str) -> Optional[Dict[str, Any]]:
+    def page_request(self, suffix: str) -> Generator:
         url = self.url.format(self.base_url, suffix)
         logging.debug("{} paginated get request to {}".format(self.__str__(), url))
         while True:
@@ -74,7 +74,7 @@ class SentryAPIClient:
 
 
 class SentryProvider:
-    def __init__(self, url: str, token: str, org_slug: str):
+    def __init__(self, url: str = None, token: str = None, org_slug: str = None):
         self.url = url
         self.org_slug = org_slug
         self._client = SentryAPIClient(token, SENTRY_URL)
@@ -131,14 +131,14 @@ class SentryProvider:
 
         return result
 
-    def _get_dsn_and_key_id(self, project_slug: str) -> Tuple[str, int]:
+    def _get_dsn_and_key_id(self, project_slug: str) -> tuple:
         status_code, result = self._client.simple_request(
             "get",
             "projects/{}/{}/keys/".format(self.org_slug, project_slug),
         )
 
         if status_code != 200:
-            return None
+            return None, None
         if (
             result
             and len(result) > 0

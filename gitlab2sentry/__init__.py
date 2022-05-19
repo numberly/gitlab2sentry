@@ -1,9 +1,9 @@
 import logging
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
-from gitlab.v4.objects import Project, ProjectMergeRequest
+from gitlab.v4.objects import Project, ProjectMergeRequest, Group
 
 from gitlab2sentry.exceptions import (
     SentryProjectCreationFailed,
@@ -50,9 +50,9 @@ class Gitlab2Sentry:
                 by_project[mr.project_id].append(mr)
         return by_project
 
-    def _ensure_sentry_group(self, group, name) -> None:
+    def _ensure_sentry_group(self, group: Group, name: str) -> None:
         logging.debug(
-            "{}: Handling gitlab group {}".format(self.__str(), group.full_name)
+            "{}: Handling gitlab group {}".format(self.__str__(), group.full_name)
         )
         if name not in self.sentry_groups:
             self.sentry_provider.ensure_sentry_team(name)
@@ -87,7 +87,7 @@ class Gitlab2Sentry:
         else:
             return True
 
-    def _project_has_dsn_file(self, project: Project) -> bool:
+    def _project_has_dsn_file(self, project: Project) -> Tuple[bool, bool]:
         has_sentryclirc, has_dsn = self.gitlab_provider.get_sentryclirc(project.id)
 
         if has_sentryclirc and has_dsn:
@@ -113,8 +113,19 @@ class Gitlab2Sentry:
             return True
         else:
             return False
+    def _closed_mr_found(self, name_with_namespace: str, mr: ProjectMergeRequest):
+        if mr.state == "closed":
+            logging.info(
+                "{} Project {} declined our sentryclirc MR".format(
+                    self.__str__(), name_with_namespace
+                )
+            )
+            self.run_stats["mr_sentryclirc_closed"] += 1
+            return True
+        else:
+            return False
 
-    def _create_sentry_project_created(
+    def _create_sentry_project(
         self, project_path: str, sentry_group_name: str, name_with_namespace: str
     ) -> Optional[Dict[str, Any]]:
         sentry_project_name = "-".join(project_path.split("/")[1:])
@@ -152,7 +163,7 @@ class Gitlab2Sentry:
 
             sentry_group_name = group.full_name.split("/")[0].strip()
 
-            self._ensure_sentry_group(sentry_group_name)
+            self._ensure_sentry_group(group, sentry_group_name)
 
             for project in group.projects.list(all=True, archived=False):
                 # Skip MR if:
@@ -175,8 +186,7 @@ class Gitlab2Sentry:
                         ):
                             break
                     else:
-                        sentry_project = self._sentry_project_created(
-                            self,
+                        sentry_project = self._create_sentry_project(
                             project.path_with_namespace,
                             sentry_group_name,
                             project.name_with_namespace,
@@ -221,12 +231,6 @@ class Gitlab2Sentry:
                         ):
                             break
                         elif self._closed_mr_found(project.name_with_namespace, mr):
-                            logging.info(
-                                "{} Project {} declined our sentryclirc MR".format(
-                                    self.__str__(), project.name_with_namespace
-                                )
-                            )
-                            self.run_stats["mr_sentryclirc_closed"] += 1
                             break
                     else:
                         logging.info(
@@ -239,7 +243,7 @@ class Gitlab2Sentry:
                             self.gitlab_provider.create_sentryclirc_mr(project)
                         except Exception as err:
                             logging.warning(
-                                "{} project {} failed to create the .sentryclirc MR ({})".format(
+                                "{} project {} failed to create the .sentryclirc MR ({})".format(  # noqa E501
                                     self.__str__(),
                                     project.name_with_namespace,
                                     str(err),
