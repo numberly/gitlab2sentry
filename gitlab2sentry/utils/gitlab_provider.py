@@ -1,5 +1,5 @@
 import logging
-from typing import Tuple
+from typing import Any, List, Tuple
 
 from gitlab.exceptions import GitlabGetError
 from gitlab2sentry.resources import (
@@ -42,13 +42,13 @@ class GitlabProvider:
         return gitlab
 
     @property
-    def mrs(self):
+    def mrs(self) -> List[Any, Any]:
         return self.gitlab.mergerequests.list(
             all=True, state="all", scope="created_by_me"
         )
 
     @property
-    def groups(self):
+    def groups(self) -> List[Any, Any]:
         return self.gitlab.groups.list(
             all=True, include_subgroups=True
         )
@@ -146,7 +146,7 @@ class GitlabProvider:
             }
         )
 
-    def create_sentryclirc_mr(self, project: Project):
+    def create_sentryclirc_mr(self, project: Project) -> None:
         self._create_mr(
             project,
             SENTRYCLIRC_MR_TITLE,

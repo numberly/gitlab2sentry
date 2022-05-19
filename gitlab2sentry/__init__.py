@@ -1,16 +1,14 @@
-from typing import Dict
+from typing import Dict, List, Optional
 import logging
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 from typing import Any
-from gitlab.v4.objects import Project
-import sentry_sdk
+from gitlab.v4.objects import Project, ProjectMergeRequest
+from gitlab2sentry.exceptions import SentryProjectCreationFailed, SentryProjectKeyIDNotFound
 from gitlab2sentry.resources import (
     GITLAB_MR_KEYWORD,
     GITLAB_TOKEN,
     GITLAB_URL,
-    SENTRY_DSN,
-    SENTRY_ENV,
     SENTRY_ORG_SLUG,
     SENTRY_TOKEN,
     SENTRY_URL,
@@ -33,20 +31,23 @@ class Gitlab2Sentry():
         self.yesterday = datetime.utcnow() - timedelta(hours=24)
         self.sentry_groups = set()
 
-    def _get_gitlab_provider(self):
+    def __str__(self) -> str:
+        return "<Gitlab2Sentry>"
+
+    def _get_gitlab_provider(self) -> GitlabProvider:
         return GitlabProvider(
             url=GITLAB_URL,
             token=GITLAB_TOKEN
         )
 
-    def _get_sentry_provider(self):
+    def _get_sentry_provider(self) -> SentryProvider:
         return SentryProvider(
             SENTRY_URL,
             auth_token=SENTRY_TOKEN,
             org_slug=SENTRY_ORG_SLUG
         )
 
-    def _get_mr_counters(self):
+    def _get_mr_counters(self) -> Dict[List[ProjectMergeRequest]]:
         by_project = defaultdict(list)
         for mr in self.gitlab_provider.mrs:
             if GITLAB_MR_KEYWORD in mr.title.lower():
@@ -63,10 +64,7 @@ class Gitlab2Sentry():
             self.sentry_provider.ensure_sentry_team(name)
             self.sentry_groups.add(name)
 
-    def _project_mrs_disabled(
-        self,
-        project: Project
-    ) -> bool:
+    def _project_mrs_disabled(self, project: Project) -> bool:
         if not project.merge_requests_enabled:
             logging.info(
                 "{}: Project {} does not accept MRs".format(
@@ -78,10 +76,7 @@ class Gitlab2Sentry():
         else:
             return False
 
-    def _project_created_yesterday(
-        self,
-        project: Project
-    ) -> bool:
+    def _project_created_yesterday(self, project: Project) -> bool:
         if (
             datetime.fromisoformat(
                 project.last_activity_at.replace("Z", "")
@@ -113,12 +108,7 @@ class Gitlab2Sentry():
 
         return has_sentryclirc, has_dsn
 
-    def _opened_mr_found(
-        self,
-        name_with_namespace: Project,
-        mr,
-        mr_type: str
-    ) -> bool:
+    def _opened_mr_found(self, name_with_namespace: Project, mr: ProjectMergeRequest, mr_type: str) -> bool:
         if mr.state == "opened":
             logging.info(
                 "{}: Project {} has a pending {} MR".format(
@@ -132,12 +122,7 @@ class Gitlab2Sentry():
         else:
             return False
 
-    def _create_sentry_project_created(
-        self,
-        project_path:str,
-        sentry_group_name: str,
-        name_with_namespace: str
-    ) -> Any:
+    def _create_sentry_project_created(self, project_path:str, sentry_group_name: str, name_with_namespace: str) -> Optional[Dict[str, Any]]:
         sentry_project_name = "-".join(
             project_path.split("/")[1:]
         )
@@ -150,13 +135,19 @@ class Gitlab2Sentry():
                 sentry_group_name,
                 sentry_project_name,
             )
+        except SentryProjectCreationFailed as creation_err:
+            logging.warning(
+                "{} Project {} - failed to create sentry project: {}".format(
+                    self.__str__(), name_with_namespace, str(creation_err)
+                )
+            )
         except Exception as err:
             logging.warning(
                 "{} Project {} failed to get/create its sentry project: {}".format(
                     self.__str__(), name_with_namespace, str(err)
                 )
             )
-            return None
+        return None
 
     def update(self) -> Dict[str, Any]:
         mr_by_project = self._get_mr_counters()
@@ -205,10 +196,20 @@ class Gitlab2Sentry():
 
                         if not sentry_project:
                             continue
+                        try:
+                            dsn = self.sentry_provider.set_rate_limit_for_key(
+                                sentry_project["slug"]
+                            )
+                        except SentryProjectKeyIDNotFound as key_id_err:
+                            logging.warning(
+                                "{}: Project {} sentry key id not found: {}".format(
+                                    self.__str__(),
+                                    project.name_with_namespace,
+                                    key_id_err
+                                )
+                            )
+                            continue
 
-                        dsn = self.sentry_provider.set_rate_limit_for_key(
-                            sentry_project["slug"]
-                        )
                         logging.info(
                             "{}: Project {} sentry dsn: {}".format(
                                 self.__str__(),
@@ -260,5 +261,4 @@ class Gitlab2Sentry():
                                     self.__str__(), project.name_with_namespace, str(err)
                                 )
                             )
-
-        logging.info(f"run stats: {dict(self.run_stats)}")
+        return dict(self.run_stats)

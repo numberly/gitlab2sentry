@@ -21,7 +21,7 @@ class SentryAPIClient:
             "Authorization": f"Bearer {token}"
         }
 
-    def __str__():
+    def __str__() -> str:
         return "<SentryAPIClient>"
 
     def _get_json(self, response: Response) -> Optional[Dict[str, Any]]:
@@ -102,7 +102,7 @@ class SentryProvider:
         self.org_slug = org_slug
         self._client = SentryAPIClient(token, SENTRY_URL)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "<SentryProvider>"
 
     def _create_or_get_team(self, team_name: str) -> Optional[Dict[str, Any]]:
@@ -134,7 +134,7 @@ class SentryProvider:
         )
         return result
 
-    def get_project(self, project_slug: str) -> Optional[Dict[str, Any]]:
+    def _get_project(self, project_slug: str) -> Optional[Dict[str, Any]]:
         status_code, result = self._client.simple_request(
             "get",
             "projects/{}/{}/".format(
@@ -145,7 +145,7 @@ class SentryProvider:
             return None
         return result
 
-    def create_or_get_project(self, team: str, project: str) -> Dict[str, Any]:
+    def create_or_get_project(self, team: str, project: str) -> Optional[Dict[str, Any]]:
         project_slug = slugify(project).lower()
         status_code, result = self._client.simple_request(
             "post",
@@ -159,7 +159,7 @@ class SentryProvider:
         )
         if status_code != 201:
             if status_code == 409:
-                return self.get_project(project_slug)
+                return self._get_project(project_slug)
             raise SentryProjectCreationFailed(result)
 
         return result
