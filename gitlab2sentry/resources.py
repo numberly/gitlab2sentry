@@ -1,16 +1,14 @@
 import os
 
 import yaml
-from gitlab2sentry.exceptions import InvalidYamlConfigError
 
+from gitlab2sentry.exceptions import InvalidYamlConfigError
 
 with open("config.yaml", "r") as config_file:
     try:
         config = yaml.safe_load(config_file)
     except yaml.YAMLError as exc:
-        raise InvalidYamlConfigError(
-            f"Invalid Config File: {str(exc)}"
-        )
+        raise InvalidYamlConfigError(f"Invalid Config File: {str(exc)}")
 
 
 # Sentry configuration
@@ -22,7 +20,7 @@ SENTRY_ORG_SLUG = config["sentry"]["slug"]
 
 # DSN MR configuration.
 DSN_MR_CONTENT = config["gitlab"]["dsn_mr"]["content"]
-DSN_MR_MSG= config["gitlab"]["dsn_mr"]["message"]
+DSN_MR_MSG = config["gitlab"]["dsn_mr"]["message"]
 DSN_MR_TITLE = config["gitlab"]["dsn_mr"]["title"]
 DSN_MR_DESCRIPTION = config["gitlab"]["dsn_mr"]["description"]
 

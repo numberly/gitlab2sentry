@@ -1,10 +1,14 @@
-from typing import Dict, List, Optional
 import logging
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Dict, List, Optional
+
 from gitlab.v4.objects import Project, ProjectMergeRequest
-from gitlab2sentry.exceptions import SentryProjectCreationFailed, SentryProjectKeyIDNotFound
+
+from gitlab2sentry.exceptions import (
+    SentryProjectCreationFailed,
+    SentryProjectKeyIDNotFound,
+)
 from gitlab2sentry.resources import (
     GITLAB_MR_KEYWORD,
     GITLAB_TOKEN,
@@ -13,8 +17,7 @@ from gitlab2sentry.resources import (
     SENTRY_TOKEN,
     SENTRY_URL,
 )
-from gitlab2sentry.utils import GitlabProvider, SentryProvider, sentry_provider
-
+from gitlab2sentry.utils import GitlabProvider, SentryProvider
 
 logging.basicConfig(
     level=logging.INFO,
@@ -23,7 +26,7 @@ logging.basicConfig(
 )
 
 
-class Gitlab2Sentry():
+class Gitlab2Sentry:
     def __init__(self):
         self.gitlab_provider = self._get_gitlab_provider()
         self.sentry_provider = self._get_sentry_provider()
@@ -35,19 +38,12 @@ class Gitlab2Sentry():
         return "<Gitlab2Sentry>"
 
     def _get_gitlab_provider(self) -> GitlabProvider:
-        return GitlabProvider(
-            url=GITLAB_URL,
-            token=GITLAB_TOKEN
-        )
+        return GitlabProvider(GITLAB_URL, GITLAB_TOKEN)
 
     def _get_sentry_provider(self) -> SentryProvider:
-        return SentryProvider(
-            SENTRY_URL,
-            auth_token=SENTRY_TOKEN,
-            org_slug=SENTRY_ORG_SLUG
-        )
+        return SentryProvider(SENTRY_URL, SENTRY_TOKEN, SENTRY_ORG_SLUG)
 
-    def _get_mr_counters(self) -> Dict[List[ProjectMergeRequest]]:
+    def _get_mr_counters(self) -> Dict[str, List[ProjectMergeRequest]]:
         by_project = defaultdict(list)
         for mr in self.gitlab_provider.mrs:
             if GITLAB_MR_KEYWORD in mr.title.lower():
@@ -56,9 +52,7 @@ class Gitlab2Sentry():
 
     def _ensure_sentry_group(self, group, name) -> None:
         logging.debug(
-            "{}: Handling gitlab group {}".format(
-                self.__str(), group.full_name
-            )
+            "{}: Handling gitlab group {}".format(self.__str(), group.full_name)
         )
         if name not in self.sentry_groups:
             self.sentry_provider.ensure_sentry_team(name)
@@ -78,9 +72,8 @@ class Gitlab2Sentry():
 
     def _project_created_yesterday(self, project: Project) -> bool:
         if (
-            datetime.fromisoformat(
-                project.last_activity_at.replace("Z", "")
-            ) < self.yesterday
+            datetime.fromisoformat(project.last_activity_at.replace("Z", ""))
+            < self.yesterday
         ):
             logging.info(
                 "{}: Project {} skipped due to last".format(
@@ -88,15 +81,14 @@ class Gitlab2Sentry():
                 ),
                 "{}: Activity being {}".format(
                     self.__str__(), project.last_activity_at
-                )
+                ),
             )
             return False
         else:
             return True
 
     def _project_has_dsn_file(self, project: Project) -> bool:
-        has_sentryclirc, has_dsn = \
-            self.gitlab_provider.get_sentryclirc(project.id)
+        has_sentryclirc, has_dsn = self.gitlab_provider.get_sentryclirc(project.id)
 
         if has_sentryclirc and has_dsn:
             logging.info(
@@ -108,13 +100,13 @@ class Gitlab2Sentry():
 
         return has_sentryclirc, has_dsn
 
-    def _opened_mr_found(self, name_with_namespace: Project, mr: ProjectMergeRequest, mr_type: str) -> bool:
+    def _opened_mr_found(
+        self, name_with_namespace: Project, mr: ProjectMergeRequest, mr_type: str
+    ) -> bool:
         if mr.state == "opened":
             logging.info(
                 "{}: Project {} has a pending {} MR".format(
-                    self.__str__(),
-                    name_with_namespace,
-                    mr_type
+                    self.__str__(), name_with_namespace, mr_type
                 )
             )
             self.run_stats[f"mr_{mr_type}_waiting"] += 1
@@ -122,14 +114,13 @@ class Gitlab2Sentry():
         else:
             return False
 
-    def _create_sentry_project_created(self, project_path:str, sentry_group_name: str, name_with_namespace: str) -> Optional[Dict[str, Any]]:
-        sentry_project_name = "-".join(
-            project_path.split("/")[1:]
-        )
+    def _create_sentry_project_created(
+        self, project_path: str, sentry_group_name: str, name_with_namespace: str
+    ) -> Optional[Dict[str, Any]]:
+        sentry_project_name = "-".join(project_path.split("/")[1:])
         logging.info(
-            "{}: Creating sentry project {}".format(
-                self.__str__(), sentry_project_name
-            ))
+            "{}: Creating sentry project {}".format(self.__str__(), sentry_project_name)
+        )
         try:
             return self.sentry_provider.create_or_get_project(
                 sentry_group_name,
@@ -168,8 +159,7 @@ class Gitlab2Sentry():
                 # Project has MR disabled
                 # Project was created before yesterday
                 # Has both dsn and sentryclirc files
-                has_sentryclirc, has_dsn = \
-                    self._project_has_dsn_file(project)
+                has_sentryclirc, has_dsn = self._project_has_dsn_file(project)
                 if (
                     self._project_mrs_disabled(project)
                     or not self._project_created_yesterday(project)
@@ -181,9 +171,7 @@ class Gitlab2Sentry():
                 if has_sentryclirc and not has_dsn:
                     for mr in mr_by_project[project.id]:
                         if self._opened_mr_found(
-                            project.name_with_namespace,
-                            mr,
-                            "dsn"
+                            project.name_with_namespace, mr, "dsn"
                         ):
                             break
                     else:
@@ -191,7 +179,7 @@ class Gitlab2Sentry():
                             self,
                             project.path_with_namespace,
                             sentry_group_name,
-                            project.name_with_namespace
+                            project.name_with_namespace,
                         )
 
                         if not sentry_project:
@@ -205,16 +193,14 @@ class Gitlab2Sentry():
                                 "{}: Project {} sentry key id not found: {}".format(
                                     self.__str__(),
                                     project.name_with_namespace,
-                                    key_id_err
+                                    key_id_err,
                                 )
                             )
                             continue
 
                         logging.info(
                             "{}: Project {} sentry dsn: {}".format(
-                                self.__str__(),
-                                project.name_with_namespace,
-                                dsn
+                                self.__str__(), project.name_with_namespace, dsn
                             )
                         )
                         logging.info(
@@ -231,14 +217,10 @@ class Gitlab2Sentry():
                 elif not has_sentryclirc:
                     for mr in mr_by_project[project.id]:
                         if self._opened_mr_found(
-                            project.name_with_namespace,
-                            mr,
-                            "sentryclirc"
+                            project.name_with_namespace, mr, "sentryclirc"
                         ):
                             break
-                        elif self._closed_mr_found(
-                            project.name_with_namespace, mr
-                        ):
+                        elif self._closed_mr_found(project.name_with_namespace, mr):
                             logging.info(
                                 "{} Project {} declined our sentryclirc MR".format(
                                     self.__str__(), project.name_with_namespace
@@ -258,7 +240,9 @@ class Gitlab2Sentry():
                         except Exception as err:
                             logging.warning(
                                 "{} project {} failed to create the .sentryclirc MR ({})".format(
-                                    self.__str__(), project.name_with_namespace, str(err)
+                                    self.__str__(),
+                                    project.name_with_namespace,
+                                    str(err),
                                 )
                             )
         return dict(self.run_stats)
