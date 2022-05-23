@@ -10,7 +10,6 @@ from gitlab2sentry.exceptions import (
     SentryProjectCreationFailed,
     SentryProjectKeyIDNotFound,
 )
-from gitlab2sentry.resources import SENTRY_TOKEN, SENTRY_URL
 
 
 class SentryAPIClient:
@@ -77,27 +76,25 @@ class SentryProvider:
     def __init__(self, url: str = None, token: str = None, org_slug: str = None):
         self.url = url
         self.org_slug = org_slug
-        self._client = SentryAPIClient(token, SENTRY_URL)
+        self._client = SentryAPIClient(token, url)
 
     def __str__(self) -> str:
         return "<SentryProvider>"
 
-    def _create_or_get_team(self, team_name: str) -> Optional[Dict[str, Any]]:
+    def _get_or_create_team(self, team_name: str) -> Optional[Dict[str, Any]]:
         team_slug = slugify(team_name)
         status_code, result = self._client.simple_request(
             "post",
-            "/organizations/{}/teams/".format(self.org_slug),
+            "organizations/{}/teams/".format(self.org_slug),
             {
                 "name": team_name,
                 "slug": team_slug,
             },
         )
-
         if status_code == 409:
             return self._client.simple_request(
                 "get", "teams/{}/{}/".format(self.org_slug, team_slug)
             )[1]
-
         if status_code != 201:
             return None
 
@@ -162,8 +159,11 @@ class SentryProvider:
             return None
         return dsn
 
-    def ensure_sentry_team(self, team_name: str) -> None:
+    def ensure_sentry_team(self, team_name: str) -> bool:
         logging.info(
             "{}: Ensuring team {} exists on sentry".format(self.__str__(), team_name)
         )
-        self._create_or_get_team(team_name)
+        if self._get_or_create_team(team_name):
+            return True
+        else:
+            return False
