@@ -37,7 +37,9 @@ gitlab:
     author:
       name: gitlab2sentry
       email: gitlab2sentry@numberly.com
+    graphql_suffix: api/graphql
     mentions:
       - "@all"
     keyword: sentry
     remove_source: true
+    group_identifier: team-
