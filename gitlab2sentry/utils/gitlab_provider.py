@@ -1,29 +1,72 @@
 import logging
-from typing import List, Optional, Tuple
+from typing import Dict, Generator, NamedTuple, Optional
 
+import aiohttp
 from gitlab import Gitlab
-from gitlab.exceptions import GitlabGetError
-from gitlab.v4.objects import Group, Project, ProjectMergeRequest
+from gitlab.v4.objects import Project
+from gql import Client, gql
+from gql.transport.aiohttp import AIOHTTPTransport, ExecutionResult
+from gql.transport.aiohttp import log as websockets_logger
 
 from gitlab2sentry.resources import (
+    DSN_BRANCH_NAME,
     DSN_MR_CONTENT,
     DSN_MR_DESCRIPTION,
-    DSN_MR_BRANCH_NAME,
     DSN_MR_TITLE,
     GITLAB_AUTHOR_EMAIL,
     GITLAB_AUTHOR_NAME,
+    GITLAB_GRAPHQL_SUFFIX,
     GITLAB_MENTIONS_LIST,
     GITLAB_RMV_SRC_BRANCH,
     GITLAB_TOKEN,
     GITLAB_URL,
+    GRAPHQL_PROJECTS_QUERY,
     SENTRY_URL,
+    SENTRYCLIRC_BRANCH_NAME,
     SENTRYCLIRC_COM_MSG,
     SENTRYCLIRC_FILEPATH,
     SENTRYCLIRC_MR_CONTENT,
     SENTRYCLIRC_MR_DESCRIPTION,
-    SENTRYCLIRC_BRANCH_NAME,
     SENTRYCLIRC_MR_TITLE,
 )
+
+
+class GraphQLClient:
+    def __init__(self, url: str = None, token: str = None):
+        self._client = Client(
+            transport=self._get_transport(url, token), fetch_schema_from_transport=True
+        )
+        websockets_logger.setLevel(logging.WARNING)
+
+    def __str__(self):
+        return "<GraphQLClient>"
+
+    def _get_transport(self, url: str, token: str) -> AIOHTTPTransport:
+        return AIOHTTPTransport(
+            url="{}/{}".format(url, GITLAB_GRAPHQL_SUFFIX),
+            headers={"PRIVATE-TOKEN": token, "Content-Type": "application/json"},
+        )
+
+    def query(self, query: Dict[str, str], endCursor: str) -> ExecutionResult:
+        afterStatement = '(after: "{}")'.format(endCursor) if endCursor else ""
+        titlesListMRs = '(sourceBranches: ["{}","{}"])'.format(
+            SENTRYCLIRC_BRANCH_NAME, DSN_BRANCH_NAME
+        )
+        blobsPaths = '(paths: "{}")'.format(SENTRYCLIRC_FILEPATH)
+        try:
+            logging.info(
+                "{}: Quering with GraphQL (query_name: {}) - cursor: {}".format(
+                    self.__str__(), query["name"], endCursor
+                )
+            )
+            return self._client.execute(
+                gql(query["body"] % (afterStatement, blobsPaths, titlesListMRs))
+            )
+        except aiohttp.client_exceptions.ClientResponseError:
+            logging.warning(
+                "{}: Query {} - Returned 404".format(self.__str__(), query["name"])
+            )
+            return {}
 
 
 class GitlabProvider:
@@ -31,6 +74,7 @@ class GitlabProvider:
         self, url: Optional[str] = GITLAB_URL, token: Optional[str] = GITLAB_TOKEN
     ) -> None:
         self.gitlab = self._get_gitlab(url, token)
+        self._gql_client = GraphQLClient(url, token)
 
     def __str__(self):
         return "<GitlabProvider>"
@@ -40,15 +84,27 @@ class GitlabProvider:
         gitlab.auth()
         return gitlab
 
-    @property
-    def mrs(self) -> List[ProjectMergeRequest]:
-        return self.gitlab.mergerequests.list(
-            all=True, state="all", scope="created_by_me"
-        )
+    def _get_g2s_projects(self, endCursor: str = "") -> Generator:
+        while True:
+            result = self._gql_client.query(GRAPHQL_PROJECTS_QUERY, endCursor)
+            if (
+                result
+                and result.get("projects", None)
+                and result["projects"].get("edges", None)
+                and len(result["projects"]["edges"])
+            ):
+                yield result["projects"]["edges"]
 
-    @property
-    def groups(self) -> List[Group]:
-        return self.gitlab.groups.list(all=True, include_subgroups=True)
+                if (
+                    result
+                    and result.get("projects", None)
+                    and result["projects"].get("pageInfo", None)
+                    and result["projects"]["pageInfo"].get("endCursor", None)
+                    and result["projects"]["pageInfo"]["endCursor"]
+                ):
+                    endCursor = result["projects"]["pageInfo"]["endCursor"]
+            else:
+                break
 
     def _get_or_create_branch(self, branch_name: str, project: Project) -> None:
         try:
@@ -96,13 +152,14 @@ class GitlabProvider:
 
     def _create_mr(
         self,
-        project: Project,
+        g2s_project: NamedTuple,
         branch_name: str,
         file_path: str,
         content: str,
         title: str,
         description: tuple,
     ) -> None:
+        project = self.gitlab.project.get(g2s_project.id)
         self._get_or_create_branch(branch_name, project)
         self._get_or_create_sentryclirc(project, branch_name, file_path, content)
         project.mergerequests.create(
@@ -115,44 +172,24 @@ class GitlabProvider:
             }
         )
 
-    def create_sentryclirc_mr(self, project: Project) -> None:
+    def create_sentryclirc_mr(self, g2s_project: NamedTuple) -> None:
         self._create_mr(
-            project,
+            g2s_project,
             SENTRYCLIRC_BRANCH_NAME,
             SENTRYCLIRC_FILEPATH,
             SENTRYCLIRC_MR_CONTENT.format(sentry_url=SENTRY_URL),
-            SENTRYCLIRC_MR_TITLE.format(project.name),
-            self._get_mr_msg(SENTRYCLIRC_MR_DESCRIPTION, project.name_with_namespace),
+            SENTRYCLIRC_MR_TITLE.format(g2s_project.name),
+            self._get_mr_msg(
+                SENTRYCLIRC_MR_DESCRIPTION, g2s_project.name_with_namespace
+            ),
         )
 
-    def create_dsn_mr(self, project: Project, dsn: str) -> None:
+    def create_dsn_mr(self, g2s_project: NamedTuple, dsn: str) -> None:
         self._create_mr(
-            project,
-            DSN_MR_BRANCH_NAME,
+            g2s_project,
+            DSN_BRANCH_NAME,
             SENTRYCLIRC_FILEPATH,
             DSN_MR_CONTENT.format(sentry_url=SENTRY_URL, dsn=dsn),
-            DSN_MR_TITLE.format(project_name=project.name),
-            self._get_mr_msg(DSN_MR_DESCRIPTION,  project.name_with_namespace),
+            DSN_MR_TITLE.format(project_name=g2s_project.name),
+            self._get_mr_msg(DSN_MR_DESCRIPTION, g2s_project.name_with_namespace),
         )
-
-    def get_sentryclirc(self, project_id: int) -> Tuple[bool, bool]:
-        has_file, has_dsn = False, False
-        try:
-            project = self.gitlab.projects.get(project_id)
-            f = project.files.get(
-                file_path=SENTRYCLIRC_FILEPATH, ref=project.default_branch
-            )
-        except GitlabGetError:
-            pass
-        else:
-            has_file = True
-            for line in f.decode().splitlines():
-                if line.startswith(b"dsn"):
-                    has_dsn = True
-
-        logging.debug(
-            "{}: Project {}".format(self.__str__(), project.name_with_namespace),
-            "{}: has_sentryclirc={}".format(self.__str__(), has_file),
-            "{}: has_dsn={}".format(self.__str__(), has_dsn),
-        )
-        return has_file, has_dsn
