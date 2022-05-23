@@ -20,7 +20,7 @@ SENTRY_ORG_SLUG = config["sentry"]["slug"]
 
 # DSN MR configuration.
 DSN_MR_CONTENT = config["gitlab"]["dsn_mr"]["content"]
-DSN_MR_BRANCH_NAME = config["gitlab"]["dsn_mr"]["branch_name"]
+DSN_BRANCH_NAME = config["gitlab"]["dsn_mr"]["branch_name"]
 DSN_MR_TITLE = config["gitlab"]["dsn_mr"]["title"]
 DSN_MR_DESCRIPTION = config["gitlab"]["dsn_mr"]["description"]
 
@@ -35,8 +35,50 @@ SENTRYCLIRC_MR_DESCRIPTION = config["gitlab"]["sentryclirc_mr"]["description"]
 # Gitlab Configuration.
 GITLAB_URL = os.getenv("GITLAB_URL")
 GITLAB_TOKEN = os.getenv("GITLAB_TOKEN")
+GITLAB_GRAPHQL_SUFFIX = config["gitlab"]["config"]["graphql_suffix"]
 GITLAB_AUTHOR_EMAIL = config["gitlab"]["config"]["author"]["email"]
 GITLAB_AUTHOR_NAME = config["gitlab"]["config"]["author"]["name"]
 GITLAB_RMV_SRC_BRANCH = config["gitlab"]["config"]["remove_source"]
 GITLAB_MENTIONS_LIST = config["gitlab"]["config"]["mentions"]
 GITLAB_MR_KEYWORD = config["gitlab"]["config"]["keyword"]
+GITLAB_GROUP_IDENTIFIER = config["gitlab"]["config"]["group_identifier"]
+
+# GraphQL Queries.
+GRAPHQL_PROJECTS_QUERY = {
+    "name": "OPENED_MRS_QUERY",
+    "body": """
+{
+    projects%s {
+        edges {
+            node {
+                id
+                name
+                mergeRequestsEnabled
+                group {
+                    name
+                }
+                repository {
+                    blobs%s {
+                        nodes {
+                            name
+                            plainData
+                        }
+                    }
+                }
+                mergeRequests%s {
+                    nodes {
+                        id
+                        title
+                        state
+                    }
+                }
+            }
+        }
+        pageInfo {
+            endCursor
+            hasNextPage
+        }
+    }
+}
+""",
+}
