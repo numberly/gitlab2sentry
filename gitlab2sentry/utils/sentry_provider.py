@@ -84,17 +84,19 @@ class SentryProvider:
     def _get_or_create_team(self, team_name: str) -> Optional[Dict[str, Any]]:
         team_slug = slugify(team_name)
         status_code, result = self._client.simple_request(
-            "post",
-            "organizations/{}/teams/".format(self.org_slug),
-            {
-                "name": team_name,
-                "slug": team_slug,
-            },
-        )
-        if status_code == 409:
+            "get", "teams/{}/{}/".format(self.org_slug, team_slug)
+        )[1]
+
+        if status_code != 200:
             return self._client.simple_request(
-                "get", "teams/{}/{}/".format(self.org_slug, team_slug)
-            )[1]
+                "post",
+                "organizations/{}/teams/".format(self.org_slug),
+                {
+                    "name": team_name,
+                    "slug": team_slug,
+                },
+            )
+
         if status_code != 201:
             return None
 
@@ -148,12 +150,22 @@ class SentryProvider:
             raise SentryProjectKeyIDNotFound(result)
 
     def set_rate_limit_for_key(self, project: str) -> Optional[str]:
-        dsn, key = self._get_dsn_and_key_id(project)
-        status_code, result = self._client.simple_request(
-            "put",
-            "projects/{}/{}/keys/{}/".format(self.org_slug, project, key),
-            {"rateLimit": {"window": 60, "count": 300}},
-        )
+        try:
+            dsn, key = self._get_dsn_and_key_id(project)
+            status_code, result = self._client.simple_request(
+                "put",
+                "projects/{}/{}/keys/{}/".format(self.org_slug, project, key),
+                {"rateLimit": {"window": 60, "count": 300}},
+            )
+        except SentryProjectKeyIDNotFound as key_id_err:
+            logging.warning(
+                "{}: Project {} sentry key id not found: {}".format(
+                    self.__str__(),
+                    project,
+                    key_id_err,
+                )
+            )
+            return None
 
         if status_code != 200:
             return None
