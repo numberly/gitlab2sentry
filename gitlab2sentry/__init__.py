@@ -65,6 +65,16 @@ class Gitlab2Sentry:
             self.sentry_provider.ensure_sentry_team(name)
             self.sentry_groups.add(name)
 
+    def _has_mrs_disabled(self, g2s_project: NamedTuple) -> bool:
+        if not g2s_project.mrs_enabled:
+            logging.info(
+                "{}: Project {} does not accept MRs".format(
+                    self.__init__(), g2s_project.name_with_namespace
+                )
+            )
+            self.run_stats["mr_disabled"] += 1
+        return g2s_project.mrs_enabled
+
     def _is_opened_mr(
         self, name_with_namespace: str, state: Optional[str], label: str
     ) -> bool:
@@ -142,6 +152,15 @@ class Gitlab2Sentry:
         else:
             return has_sentryclirc_file, has_dsn
 
+    def _has_already_sentry(self, name: str, has_file: bool, has_dsn: bool) -> bool:
+        if has_file and has_dsn:
+            logging.info(
+                "{}: Project {} has a sentry project".format(
+                    self.__init__(), name
+                )
+            )
+        return has_file and has_dsn
+
     def _get_gitlab_groups(self):
         groups = dict()
         request_gen = self.gitlab_provider._get_g2s_projects()
@@ -163,11 +182,11 @@ class Gitlab2Sentry:
                         result["node"]["repository"]["blobs"]["nodes"]
                     )
                     if not self._has_already_sentry(sentryclirc_mr_state, dsn_mr_state):
-                        name_with_namespace = "{}/{}".format(
-                            result["node"]["name"], group_name
+                        name_with_namespace = "{} / {}".format(
+                            group_name, result["node"]["name"]
                         )
                         path_with_namespace = "{}/{}".format(
-                            result["node"]["name"], group_name
+                            group_name, result["node"]["name"]
                         )
                         groups[group_name].append(
                             G2SProject(
@@ -212,11 +231,26 @@ class Gitlab2Sentry:
 
     def update(self) -> Dict[str, Any]:
         """
-        Update sentry projects, queries with GraphQL the given
-        gitlab url. It loops through the results and skips or creates MergeRequests
-        for these cases:
+        Creates sentry project for all given gitlab projects. It
+        follows a two steps process.
+            1. Adds the .sentryclirc file to the gitlab repo (via
+                a mergeRequest).
+            2. If the .sentryclirc file is added to master branch (
+                or another default branch) it creates the sentry
+                project and it inserts the dsn inside the .sentryclirc
+                file.
+        The flow for creating mrs inlcudes specific cases for creating
+        or skiping. These cases are:
             1. Project is already in sentry [skip]
-            2.
+            2. Project has MRs disabled [skip]
+            3. Project has an opened dsn MR and a .sentryclirc file.
+                This means that the second MR is pending [skip]
+            4. If the .sentryclirc file exists and there is no
+                opened MR for dsn, creates the dsn MR [create]
+            5. If the project has no .sentryclirc file but it
+                has an MR (closed or opened) [skip]
+            6. Project has no .sentryclirc file and no MR for
+                this. Create the sentryclirc file [create]
         """
         groups = self._get_gitlab_groups()
 
@@ -228,14 +262,12 @@ class Gitlab2Sentry:
 
                 # Skip if sentry is installed or
                 # Project has disabled MRs
-                if not g2s_project.mrs_enabled or (
-                    g2s_project.has_sentryclirc_file and g2s_project.has_dsn
-                ):
+                if self._has_mrs_disabled(g2s_project):
                     continue
 
                 # Case sentryclirc found but
                 # dsn not found: Pending MR
-                if g2s_project.has_sentryclirc_file and not g2s_project.has_dsn:
+                elif g2s_project.has_sentryclirc_file and not g2s_project.has_dsn:
 
                     if self._opened_mr_found(
                         g2s_project.name_with_namespace, g2s_project, "dsn"
@@ -252,27 +284,15 @@ class Gitlab2Sentry:
                         if not sentry_project:
                             continue
 
-                        try:
-                            dsn = self.sentry_provider.set_rate_limit_for_key(
-                                sentry_project["slug"]
-                            )
-                        except SentryProjectKeyIDNotFound as key_id_err:
-                            logging.warning(
-                                "{}: Project {} sentry key id not found: {}".format(
-                                    self.__str__(),
-                                    g2s_project.name_with_namespace,
-                                    key_id_err,
-                                )
-                            )
+                        dsn = self.sentry_provider.set_rate_limit_for_key(
+                            sentry_project["slug"]
+                        )
+
+                        # If fetch of dsn failed skip
+                        if not dsn:
                             continue
 
-                        logging.info(
-                            "{}: Project {} sentry dsn: {}. Opening dsn MR".format(
-                                self.__str__(), g2s_project.name_with_namespace, dsn
-                            )
-                        )
                         self.gitlab_provider.create_dsn_mr(g2s_project, dsn)
-                        self.run_stats["mr_dsn_created"] += 1
 
                 # Case sentryclirc not found:
                 # Declined sentryclirc MR or
@@ -283,22 +303,9 @@ class Gitlab2Sentry:
                     ) or self._closed_sentryclirc_mr_found(g2s_project):
                         break
                     else:
-                        logging.info(
-                            "{}: Project {} needs sentry .sentryclirc MR".format(
-                                self.__str__(), g2s_project.name_with_namespace
-                            )
-                        )
                         self.run_stats["mr_sentryclirc_created"] += 1
-                        try:
-                            self.gitlab_provider.create_sentryclirc_mr(g2s_project)
-                        except Exception as err:
-                            logging.warning(
-                                "{} project {} failed to create the .sentryclirc MR ({})".format(  # noqa E501
-                                    self.__str__(),
-                                    g2s_project.name_with_namespace,
-                                    str(err),
-                                )
-                            )
+                        self.gitlab_provider.create_sentryclirc_mr(g2s_project)
+
                 else:
                     pass
 
