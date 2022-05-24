@@ -159,21 +159,36 @@ class GitlabProvider:
         title: str,
         description: tuple,
     ) -> None:
-        project = self.gitlab.project.get(g2s_project.id)
-        self._get_or_create_branch(branch_name, project)
-        self._get_or_create_sentryclirc(project, branch_name, file_path, content)
-        project.mergerequests.create(
-            {
-                "description": description,
-                "remove_source_branch": GITLAB_RMV_SRC_BRANCH,
-                "source_branch": branch_name,
-                "target_branch": project.default_branch,
-                "title": title,
-            }
-        )
+        try:
+            project = self.gitlab.project.get(g2s_project.id)
+            self._get_or_create_branch(branch_name, project)
+            self._get_or_create_sentryclirc(project, branch_name, file_path, content)
+            project.mergerequests.create(
+                {
+                    "description": description,
+                    "remove_source_branch": GITLAB_RMV_SRC_BRANCH,
+                    "source_branch": branch_name,
+                    "target_branch": project.default_branch,
+                    "title": title,
+                }
+            )
+        except Exception as err:
+            logging.warning(
+                "{}: Project {} failed to create MR ({}): {}".format(
+                    self.__str__(),
+                    g2s_project.name_with_namespace,
+                    branch_name,
+                    str(err),
+                )
+            )
 
     def create_sentryclirc_mr(self, g2s_project: NamedTuple) -> None:
-        self._create_mr(
+        logging.info(
+            "{}: Project {} needs sentry .sentryclirc MR".format(
+                self.__str__(), g2s_project.name_with_namespace
+            )
+        )
+        mr_created = self._create_mr(
             g2s_project,
             SENTRYCLIRC_BRANCH_NAME,
             SENTRYCLIRC_FILEPATH,
@@ -183,9 +198,16 @@ class GitlabProvider:
                 SENTRYCLIRC_MR_DESCRIPTION, g2s_project.name_with_namespace
             ),
         )
+        if mr_created:
+            self.run_stats["mr_sentryclirc_created"] += 1
 
     def create_dsn_mr(self, g2s_project: NamedTuple, dsn: str) -> None:
-        self._create_mr(
+        logging.info(
+            "{}: Project {} sentry dsn: {}. Opening dsn MR".format(
+                self.__str__(), g2s_project.name_with_namespace, dsn
+            )
+        )
+        mr_created = self._create_mr(
             g2s_project,
             DSN_BRANCH_NAME,
             SENTRYCLIRC_FILEPATH,
@@ -193,3 +215,5 @@ class GitlabProvider:
             DSN_MR_TITLE.format(project_name=g2s_project.name),
             self._get_mr_msg(DSN_MR_DESCRIPTION, g2s_project.name_with_namespace),
         )
+        if mr_created:
+            self.run_stats["mr_dsn_created"] += 1
