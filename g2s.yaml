@@ -43,3 +43,5 @@ gitlab:
     keyword: sentry
     remove_source: true
     group_identifier: team-
+    graphql_aiohttp_timeout: 40
+    graphql_page_length: 50
