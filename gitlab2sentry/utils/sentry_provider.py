@@ -85,7 +85,7 @@ class SentryProvider:
         team_slug = slugify(team_name)
         status_code, result = self._client.simple_request(
             "get", "teams/{}/{}/".format(self.org_slug, team_slug)
-        )[1]
+        )
 
         if status_code != 200:
             return self._client.simple_request(
@@ -95,7 +95,7 @@ class SentryProvider:
                     "name": team_name,
                     "slug": team_slug,
                 },
-            )
+            )[1]
 
         if status_code != 201:
             return None
@@ -103,29 +103,34 @@ class SentryProvider:
         logging.info("{}: Team {} created!".format(self.__str__(), team_name))
         return result
 
-    def _get_project(self, project_slug: str) -> Optional[Dict[str, Any]]:
+    def get_or_create_project(
+        self, group_name: str, project_name: str
+    ) -> Optional[Dict[str, Any]]:
+
+        project_slug = slugify(project_name).lower()
         status_code, result = self._client.simple_request(
             "get", "projects/{}/{}/".format(self.org_slug, project_slug)
         )
-        if status_code != 200:
-            return None
-        return result
+        # Create if project not found
+        if status_code == 404:
+            status_code, result = self._client.simple_request(
+                "post",
+                "teams/{}/{}/projects/".format(self.org_slug, group_name),
+                {
+                    "name": project_name,
+                    "slug": project_slug,
+                },
+            )
 
-    def create_or_get_project(
-        self, team: str, project: str
-    ) -> Optional[Dict[str, Any]]:
-        project_slug = slugify(project).lower()
-        status_code, result = self._client.simple_request(
-            "post",
-            "teams/{}/{}/projects/".format(self.org_slug, team),
-            {
-                "name": project,
-                "slug": project_slug,
-            },
-        )
-        if status_code != 201:
-            if status_code == 409:
-                return self._get_project(project_slug)
+        if status_code == 201:
+            logging.info(
+                "{}: Creating sentry project {}".format(self.__str__(), project_name)
+            )
+        elif status_code == 200:
+            logging.info(
+                "{}: Sentry project {} exists".format(self.__str__(), project_name)
+            )
+        else:
             raise SentryProjectCreationFailed(result)
 
         return result
@@ -149,19 +154,19 @@ class SentryProvider:
         else:
             raise SentryProjectKeyIDNotFound(result)
 
-    def set_rate_limit_for_key(self, project: str) -> Optional[str]:
+    def set_rate_limit_for_key(self, project_slug: str) -> Optional[str]:
         try:
-            dsn, key = self._get_dsn_and_key_id(project)
+            dsn, key = self._get_dsn_and_key_id(project_slug)
             status_code, result = self._client.simple_request(
                 "put",
-                "projects/{}/{}/keys/{}/".format(self.org_slug, project, key),
+                "projects/{}/{}/keys/{}/".format(self.org_slug, project_slug, key),
                 {"rateLimit": {"window": 60, "count": 300}},
             )
         except SentryProjectKeyIDNotFound as key_id_err:
             logging.warning(
                 "{}: Project {} sentry key id not found: {}".format(
                     self.__str__(),
-                    project,
+                    project_slug,
                     key_id_err,
                 )
             )
