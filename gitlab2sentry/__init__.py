@@ -113,14 +113,16 @@ class Gitlab2Sentry:
             "sentryclirc",
         )
 
-    def _get_mr_states(self, mr_list: Optional[List[Dict[str, Any]]]) -> tuple:
+    def _get_mr_states(self, project_name: str, mr_list: Optional[List[Dict[str, Any]]]) -> tuple:
         sentryclirc_mr_state, dsn_mr_state = None, None
         if mr_list:
             for mr in mr_list:
-                if mr["title"] == SENTRYCLIRC_MR_TITLE:
-                    sentryclirc_mr_state = mr["state"]
-                elif mr["title"] == DSN_MR_TITLE:
-                    dsn_mr_state = mr["state"]
+                if mr["title"] == SENTRYCLIRC_MR_TITLE.format(project_name=project_name):
+                    if not (sentryclirc_mr_state and sentryclirc_mr_state == "opened"):
+                        sentryclirc_mr_state = mr["state"]
+                elif mr["title"] == DSN_MR_TITLE.format(project_name=project_name):
+                    if not (dsn_mr_state and dsn_mr_state == "opened"):
+                        dsn_mr_state = mr["state"]
                 else:
                     pass
         return sentryclirc_mr_state, dsn_mr_state
@@ -163,6 +165,7 @@ class Gitlab2Sentry:
             ]
 
             sentryclirc_mr_state, dsn_mr_state = self._get_mr_states(
+                result["node"]["name"],
                 result["node"]["mergeRequests"]["nodes"]
             )
 
@@ -329,4 +332,4 @@ class Gitlab2Sentry:
                 else:
                     pass
 
-        return dict(self.run_stats)
+        logging.info(self.run_stats)
