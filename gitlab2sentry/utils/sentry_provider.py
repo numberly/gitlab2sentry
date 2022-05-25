@@ -10,13 +10,14 @@ from gitlab2sentry.exceptions import (
     SentryProjectCreationFailed,
     SentryProjectKeyIDNotFound,
 )
+from gitlab2sentry.resources import SENTRY_ORG_SLUG, SENTRY_TOKEN, SENTRY_URL
 
 
 class SentryAPIClient:
     def __init__(
         self,
-        token: str = None,
-        base_url: str = None,
+        base_url: Optional[str] = SENTRY_URL,
+        token: Optional[str] = SENTRY_TOKEN,
     ):
         self.base_url = base_url
         self.url = "{}/api/0/{}"
@@ -73,10 +74,15 @@ class SentryAPIClient:
 
 
 class SentryProvider:
-    def __init__(self, url: str = None, token: str = None, org_slug: str = None):
+    def __init__(
+        self,
+        url: Optional[str] = SENTRY_URL,
+        token: Optional[str] = SENTRY_TOKEN,
+        org_slug: Optional[str] = SENTRY_ORG_SLUG,
+    ):
         self.url = url
         self.org_slug = org_slug
-        self._client = SentryAPIClient(token, url)
+        self._client = SentryAPIClient(url, token)
 
     def __str__(self) -> str:
         return "<SentryProvider>"

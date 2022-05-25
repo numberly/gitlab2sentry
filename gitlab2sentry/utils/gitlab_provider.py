@@ -1,12 +1,12 @@
 import logging
-from typing import Dict, Generator, NamedTuple, Optional
+from typing import Any, Dict, Generator, Optional
 
 import aiohttp
 from gitlab import Gitlab
 from gitlab.exceptions import GitlabGetError
 from gitlab.v4.objects import Project
 from gql import Client, gql
-from gql.transport.aiohttp import AIOHTTPTransport, ExecutionResult
+from gql.transport.aiohttp import AIOHTTPTransport
 from gql.transport.aiohttp import log as websockets_logger
 
 from gitlab2sentry.resources import (
@@ -31,31 +31,38 @@ from gitlab2sentry.resources import (
     SENTRYCLIRC_MR_CONTENT,
     SENTRYCLIRC_MR_DESCRIPTION,
     SENTRYCLIRC_MR_TITLE,
+    G2SProject,
 )
 
 
 class GraphQLClient:
-    def __init__(self, url: str = None, token: str = None):
+    def __init__(
+        self, url: Optional[str] = GITLAB_URL, token: Optional[str] = GITLAB_TOKEN
+    ):
         self._client = Client(
             transport=self._get_transport(url, token),
             fetch_schema_from_transport=True,
-            execute_timeout=GITLAB_GRAPHQL_TIMEOUT
+            execute_timeout=GITLAB_GRAPHQL_TIMEOUT,
         )
         websockets_logger.setLevel(logging.WARNING)
 
     def __str__(self):
         return "<GraphQLClient>"
 
-    def _get_transport(self, url: str, token: str) -> AIOHTTPTransport:
+    def _get_transport(
+        self, url: Optional[str], token: Optional[str]
+    ) -> AIOHTTPTransport:
         return AIOHTTPTransport(
             url="{}/{}".format(url, GITLAB_GRAPHQL_SUFFIX),
-            headers={"PRIVATE-TOKEN": token, "Content-Type": "application/json"},
+            headers={
+                "PRIVATE-TOKEN": token,  # type: ignore
+                "Content-Type": "application/json",
+            },
         )
 
-    def query(self, query: Dict[str, str], endCursor: str) -> ExecutionResult:
-        projectStatement = '(first: {}{})'.format(
-            GITLAB_GRAPHQL_PAGE_LENGTH,
-            f' after: "{endCursor}"' if endCursor else ""
+    def query(self, query: Dict[str, str], endCursor: str) -> Dict[str, Any]:
+        projectStatement = "(first: {}{})".format(
+            GITLAB_GRAPHQL_PAGE_LENGTH, f' after: "{endCursor}"' if endCursor else ""
         )
         titlesListMRs = '(sourceBranches: ["{}","{}"])'.format(
             SENTRYCLIRC_BRANCH_NAME, DSN_BRANCH_NAME
@@ -138,7 +145,9 @@ class GitlabProvider:
         except GitlabGetError:
             logging.info(
                 "{}: {} file not found for project {}. Creating".format(
-                    self.__str__(), SENTRYCLIRC_FILEPATH, project.name_with_namespace,
+                    self.__str__(),
+                    SENTRYCLIRC_FILEPATH,
+                    project.name_with_namespace,
                 )
             )
             f = project.files.create(
@@ -152,7 +161,7 @@ class GitlabProvider:
                 }
             )
 
-    def _get_mr_msg(self, msg: str, name_with_namespace: str) -> tuple:
+    def _get_mr_msg(self, msg: str, name_with_namespace: str) -> str:
         return "\n".join(
             [
                 line.format(
@@ -165,13 +174,13 @@ class GitlabProvider:
 
     def _create_mr(
         self,
-        g2s_project: NamedTuple,
+        g2s_project: G2SProject,
         branch_name: str,
         file_path: str,
         content: str,
         title: str,
-        description: tuple,
-    ) -> None:
+        description: str,
+    ) -> bool:
         try:
             project = self.gitlab.projects.get(g2s_project.pid)
             self._get_or_create_branch(branch_name, project)
@@ -185,6 +194,7 @@ class GitlabProvider:
                     "title": title,
                 }
             )
+            return True
         except Exception as err:
             logging.warning(
                 "{}: Project {} failed to create MR ({}): {}".format(
@@ -194,14 +204,15 @@ class GitlabProvider:
                     str(err),
                 )
             )
+            return False
 
-    def create_sentryclirc_mr(self, g2s_project: NamedTuple) -> None:
+    def create_sentryclirc_mr(self, g2s_project: G2SProject) -> bool:
         logging.info(
             "{}: Project {} needs sentry .sentryclirc MR".format(
                 self.__str__(), g2s_project.name_with_namespace
             )
         )
-        mr_created = self._create_mr(
+        return self._create_mr(
             g2s_project,
             SENTRYCLIRC_BRANCH_NAME,
             SENTRYCLIRC_FILEPATH,
@@ -211,24 +222,18 @@ class GitlabProvider:
                 SENTRYCLIRC_MR_DESCRIPTION, g2s_project.name_with_namespace
             ),
         )
-        if mr_created:
-            self.run_stats["mr_sentryclirc_created"] += 1
 
-    def create_dsn_mr(self, g2s_project: NamedTuple, dsn: str) -> None:
+    def create_dsn_mr(self, g2s_project: G2SProject, dsn: str) -> bool:
         logging.info(
             "{}: Project {} sentry dsn: {}. Opening dsn MR".format(
                 self.__str__(), g2s_project.name_with_namespace, dsn
             )
         )
-        mr_created = self._create_mr(
+        return self._create_mr(
             g2s_project,
             DSN_BRANCH_NAME,
             SENTRYCLIRC_FILEPATH,
             DSN_MR_CONTENT.format(sentry_url=SENTRY_URL, dsn=dsn),
             DSN_MR_TITLE.format(project_name=g2s_project.name),
-            self._get_mr_msg(
-                DSN_MR_DESCRIPTION, g2s_project.name_with_namespace
-            ),
+            self._get_mr_msg(DSN_MR_DESCRIPTION, g2s_project.name_with_namespace),
         )
-        if mr_created:
-            self.run_stats["mr_dsn_created"] += 1

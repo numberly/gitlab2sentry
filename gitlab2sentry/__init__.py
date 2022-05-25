@@ -1,8 +1,8 @@
 import logging
 import time
-from collections import Counter, namedtuple
+from collections import Counter
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, NamedTuple, Optional
+from typing import Any, Dict, List, Optional
 
 from gitlab2sentry.exceptions import SentryProjectCreationFailed
 from gitlab2sentry.resources import (
@@ -16,6 +16,7 @@ from gitlab2sentry.resources import (
     SENTRY_URL,
     SENTRYCLIRC_FILEPATH,
     SENTRYCLIRC_MR_TITLE,
+    G2SProject,
 )
 from gitlab2sentry.utils import GitlabProvider, SentryProvider
 
@@ -23,23 +24,6 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(name)s %(levelname)s: %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
-)
-
-
-G2SProject = namedtuple(
-    "G2SProject",
-    [
-        "pid",
-        "name",
-        "group",
-        "mrs_enabled",
-        "name_with_namespace",
-        "path_with_namespace",
-        "has_sentryclirc_file",
-        "has_dsn",
-        "sentryclirc_mr_state",
-        "dsn_mr_state",
-    ],
 )
 
 
@@ -66,11 +50,11 @@ class Gitlab2Sentry:
             self.sentry_provider.ensure_sentry_team(name)
             self.sentry_groups.add(name)
 
-    def _has_mrs_enabled(self, g2s_project: NamedTuple) -> bool:
+    def _has_mrs_enabled(self, g2s_project: G2SProject) -> bool:
         if not g2s_project.mrs_enabled:
             logging.info(
                 "{}: Project {} does not accept MRs".format(
-                    self.__init__(), g2s_project.name_with_namespace
+                    self.__str__(), g2s_project.name_with_namespace
                 )
             )
             self.run_stats["mr_disabled"] += 1
@@ -90,12 +74,12 @@ class Gitlab2Sentry:
         else:
             return False
 
-    def _opened_dsn_mr_found(self, g2s_project: NamedTuple) -> bool:
+    def _opened_dsn_mr_found(self, g2s_project: G2SProject) -> bool:
         return self._is_opened_mr(
             g2s_project.name_with_namespace, g2s_project.dsn_mr_state, "dsn"
         )
 
-    def _opened_sentryclirc_mr_found(self, g2s_project: NamedTuple) -> bool:
+    def _opened_sentryclirc_mr_found(self, g2s_project: G2SProject) -> bool:
         return self._is_opened_mr(
             g2s_project.name_with_namespace,
             g2s_project.sentryclirc_mr_state,
@@ -117,12 +101,12 @@ class Gitlab2Sentry:
         else:
             return False
 
-    def _closed_dsn_mr_found(self, g2s_project: NamedTuple) -> bool:
+    def _closed_dsn_mr_found(self, g2s_project: G2SProject) -> bool:
         return self._is_closed_mr(
             g2s_project.name_with_namespace, g2s_project.dsn_mr_state, "dsn"
         )
 
-    def _closed_sentryclirc_mr_found(self, g2s_project: NamedTuple) -> bool:
+    def _closed_sentryclirc_mr_found(self, g2s_project: G2SProject) -> bool:
         return self._is_closed_mr(
             g2s_project.name_with_namespace,
             g2s_project.sentryclirc_mr_state,
@@ -141,10 +125,17 @@ class Gitlab2Sentry:
                     pass
         return sentryclirc_mr_state, dsn_mr_state
 
-    def _is_group_project(self, group: Optional[Dict[str, str]]) -> bool:
-        return group and group["name"] and GITLAB_GROUP_IDENTIFIER in group["name"]
+    def _is_group_project(self, group: Optional[Dict[str, Any]]) -> bool:
+        if (
+            group
+            and group.get("name")
+            and (GITLAB_GROUP_IDENTIFIER in group["name"])
+        ):
+            return True
+        else:
+            return False
 
-    def _get_sentryclirc_file(self, blob: Dict[str, Any]) -> tuple:
+    def _get_sentryclirc_file(self, blob: List[Dict[str, Any]]) -> tuple:
         has_sentryclirc_file, has_dsn = False, False
         if blob and blob[0]["name"] == SENTRYCLIRC_FILEPATH:
             has_sentryclirc_file = True
@@ -158,11 +149,11 @@ class Gitlab2Sentry:
     def _has_already_sentry(self, name: str, has_file: bool, has_dsn: bool) -> bool:
         if has_file and has_dsn:
             logging.info(
-                "{}: Project {} has a sentry project".format(self.__init__(), name)
+                "{}: Project {} has a sentry project".format(self.__str__(), name)
             )
         return has_file and has_dsn
 
-    def _get_g2s_project(self, result: Dict[str, Any]) -> Optional[NamedTuple]:
+    def _get_g2s_project(self, result: Dict[str, Any]) -> Optional[G2SProject]:
         if result["node"].get("repository"):
             group_name = result["node"]["group"]["name"]
             project_name = result["node"]["name"]
@@ -318,7 +309,9 @@ class Gitlab2Sentry:
                         if not dsn:
                             continue
 
-                        self.gitlab_provider.create_dsn_mr(g2s_project, dsn)
+                        mr_created = self.gitlab_provider.create_dsn_mr(g2s_project, dsn)
+                        if mr_created:
+                            self.run_stats["mr_dsn_created"] += 1
 
                 # Case sentryclirc not found:
                 # Declined sentryclirc MR or
@@ -329,8 +322,9 @@ class Gitlab2Sentry:
                     ) or self._closed_sentryclirc_mr_found(g2s_project):
                         break
                     else:
-                        self.run_stats["mr_sentryclirc_created"] += 1
-                        self.gitlab_provider.create_sentryclirc_mr(g2s_project)
+                        mr_created = self.gitlab_provider.create_sentryclirc_mr(g2s_project)
+                        if mr_created:
+                            self.run_stats["mr_sentryclirc_created"] += 1
 
                 else:
                     pass

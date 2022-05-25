@@ -1,5 +1,6 @@
 import logging
 import os
+from collections import namedtuple
 
 import yaml
 
@@ -55,6 +56,23 @@ except ValueError as value_error:
         "<Gitlab2Sentry>: g2s.yaml not wrong value type - {}".format(str(value_error))
     )
     exit(1)
+
+# G2SProject namedtuple configuration
+G2SProject = namedtuple(
+    "G2SProject",
+    [
+        "pid",
+        "name",
+        "group",
+        "mrs_enabled",
+        "name_with_namespace",
+        "path_with_namespace",
+        "has_sentryclirc_file",
+        "has_dsn",
+        "sentryclirc_mr_state",
+        "dsn_mr_state",
+    ],
+)
 
 # GraphQL Queries.
 GRAPHQL_PROJECTS_QUERY = {
