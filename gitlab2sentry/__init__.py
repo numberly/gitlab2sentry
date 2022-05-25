@@ -181,22 +181,21 @@ class Gitlab2Sentry:
             if not self._has_already_sentry(
                 project_name, sentryclirc_mr_state, dsn_mr_state
             ):
-                if project_name == "resetly":
-                    name_with_namespace = "{} / {}".format(group_name, project_name)
-                    path_with_namespace = "{}/{}".format(group_name, project_name)
-                    pid = int(id_url.split("/")[len(id_url.split("/")) - 1])
-                    return G2SProject(
-                        pid,
-                        project_name,
-                        group_name,
-                        mrs_enabled,
-                        name_with_namespace,
-                        path_with_namespace,
-                        has_sentryclirc_file,
-                        has_dsn,
-                        sentryclirc_mr_state,
-                        dsn_mr_state,
-                    )
+                name_with_namespace = "{} / {}".format(group_name, project_name)
+                path_with_namespace = "{}/{}".format(group_name, project_name)
+                pid = int(id_url.split("/")[len(id_url.split("/")) - 1])
+                return G2SProject(
+                    pid,
+                    project_name,
+                    group_name,
+                    mrs_enabled,
+                    name_with_namespace,
+                    path_with_namespace,
+                    has_sentryclirc_file,
+                    has_dsn,
+                    sentryclirc_mr_state,
+                    dsn_mr_state,
+                )
         return None
 
     def _get_paginated_groups(self):
