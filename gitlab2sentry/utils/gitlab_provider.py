@@ -3,6 +3,7 @@ from typing import Dict, Generator, NamedTuple, Optional
 
 import aiohttp
 from gitlab import Gitlab
+from gitlab.exceptions import GitlabGetError
 from gitlab.v4.objects import Project
 from gql import Client, gql
 from gql.transport.aiohttp import AIOHTTPTransport, ExecutionResult
@@ -15,7 +16,9 @@ from gitlab2sentry.resources import (
     DSN_MR_TITLE,
     GITLAB_AUTHOR_EMAIL,
     GITLAB_AUTHOR_NAME,
+    GITLAB_GRAPHQL_PAGE_LENGTH,
     GITLAB_GRAPHQL_SUFFIX,
+    GITLAB_GRAPHQL_TIMEOUT,
     GITLAB_MENTIONS_LIST,
     GITLAB_RMV_SRC_BRANCH,
     GITLAB_TOKEN,
@@ -34,7 +37,9 @@ from gitlab2sentry.resources import (
 class GraphQLClient:
     def __init__(self, url: str = None, token: str = None):
         self._client = Client(
-            transport=self._get_transport(url, token), fetch_schema_from_transport=True
+            transport=self._get_transport(url, token),
+            fetch_schema_from_transport=True,
+            execute_timeout=GITLAB_GRAPHQL_TIMEOUT
         )
         websockets_logger.setLevel(logging.WARNING)
 
@@ -48,19 +53,22 @@ class GraphQLClient:
         )
 
     def query(self, query: Dict[str, str], endCursor: str) -> ExecutionResult:
-        afterStatement = '(after: "{}")'.format(endCursor) if endCursor else ""
+        projectStatement = '(first: {}{})'.format(
+            GITLAB_GRAPHQL_PAGE_LENGTH,
+            f' after: "{endCursor}"' if endCursor else ""
+        )
         titlesListMRs = '(sourceBranches: ["{}","{}"])'.format(
             SENTRYCLIRC_BRANCH_NAME, DSN_BRANCH_NAME
         )
         blobsPaths = '(paths: "{}")'.format(SENTRYCLIRC_FILEPATH)
         try:
-            logging.info(
+            logging.debug(
                 "{}: Quering with GraphQL (query_name: {}) - cursor: {}".format(
                     self.__str__(), query["name"], endCursor
                 )
             )
             return self._client.execute(
-                gql(query["body"] % (afterStatement, blobsPaths, titlesListMRs))
+                gql(query["body"] % (projectStatement, blobsPaths, titlesListMRs))
             )
         except aiohttp.client_exceptions.ClientResponseError:
             logging.warning(
@@ -115,7 +123,7 @@ class GitlabProvider:
                 )
             )
             project.branches.delete(branch_name)
-        except Exception:
+        except GitlabGetError:
             pass
 
         project.branches.create({"branch": branch_name, "ref": project.default_branch})
@@ -127,7 +135,12 @@ class GitlabProvider:
             f = project.files.get(file_path=file_path, ref=project.default_branch)
             f.content = content
             f.save(branch=branch_name, commit_message=SENTRYCLIRC_COM_MSG)
-        except Exception:
+        except GitlabGetError:
+            logging.info(
+                "{}: {} file not found for project {}. Creating".format(
+                    self.__str__(), SENTRYCLIRC_FILEPATH, project.name_with_namespace,
+                )
+            )
             f = project.files.create(
                 {
                     "author_email": GITLAB_AUTHOR_EMAIL,
@@ -140,10 +153,10 @@ class GitlabProvider:
             )
 
     def _get_mr_msg(self, msg: str, name_with_namespace: str) -> tuple:
-        return tuple(
+        return "\n".join(
             [
                 line.format(
-                    mentions=GITLAB_MENTIONS_LIST.join(" ,"),
+                    mentions=", ".join(GITLAB_MENTIONS_LIST),
                     name_with_namespace=name_with_namespace,
                 )
                 for line in msg.split("\n")
@@ -160,7 +173,7 @@ class GitlabProvider:
         description: tuple,
     ) -> None:
         try:
-            project = self.gitlab.project.get(g2s_project.id)
+            project = self.gitlab.projects.get(g2s_project.pid)
             self._get_or_create_branch(branch_name, project)
             self._get_or_create_sentryclirc(project, branch_name, file_path, content)
             project.mergerequests.create(
@@ -213,7 +226,9 @@ class GitlabProvider:
             SENTRYCLIRC_FILEPATH,
             DSN_MR_CONTENT.format(sentry_url=SENTRY_URL, dsn=dsn),
             DSN_MR_TITLE.format(project_name=g2s_project.name),
-            self._get_mr_msg(DSN_MR_DESCRIPTION, g2s_project.name_with_namespace),
+            self._get_mr_msg(
+                DSN_MR_DESCRIPTION, g2s_project.name_with_namespace
+            ),
         )
         if mr_created:
             self.run_stats["mr_dsn_created"] += 1
