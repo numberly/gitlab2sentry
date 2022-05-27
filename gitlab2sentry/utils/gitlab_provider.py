@@ -1,4 +1,5 @@
 import logging
+import time
 from typing import Any, Dict, Generator, Optional
 
 import aiohttp
@@ -19,11 +20,11 @@ from gitlab2sentry.resources import (
     GITLAB_GRAPHQL_PAGE_LENGTH,
     GITLAB_GRAPHQL_SUFFIX,
     GITLAB_GRAPHQL_TIMEOUT,
+    GITLAB_GROUP_IDENTIFIER,
     GITLAB_MENTIONS_LIST,
     GITLAB_RMV_SRC_BRANCH,
     GITLAB_TOKEN,
     GITLAB_URL,
-    GRAPHQL_PROJECTS_QUERY,
     SENTRY_URL,
     SENTRYCLIRC_BRANCH_NAME,
     SENTRYCLIRC_COM_MSG,
@@ -60,26 +61,36 @@ class GraphQLClient:
             },
         )
 
-    def query(self, query: Dict[str, str], endCursor: str) -> Dict[str, Any]:
-        projectStatement = "(first: {}{})".format(
-            GITLAB_GRAPHQL_PAGE_LENGTH, f' after: "{endCursor}"' if endCursor else ""
+    def query(self, query_dict: Dict[str, str], endCursor: str) -> Dict[str, Any]:
+        whereStatement = ' searchNamespaces: true search: "{}"'.format(
+            GITLAB_GROUP_IDENTIFIER
         )
+        edgesStatement = "(first: {}{}{})".format(
+            GITLAB_GRAPHQL_PAGE_LENGTH,
+            f' after: "{endCursor}"' if endCursor else "",
+            whereStatement,
+        )
+        blobsPaths = '(paths: "{}")'.format(SENTRYCLIRC_FILEPATH)
         titlesListMRs = '(sourceBranches: ["{}","{}"])'.format(
             SENTRYCLIRC_BRANCH_NAME, DSN_BRANCH_NAME
         )
-        blobsPaths = '(paths: "{}")'.format(SENTRYCLIRC_FILEPATH)
+        query = query_dict["body"] % (edgesStatement, blobsPaths, titlesListMRs)
         try:
-            logging.debug(
-                "{}: Quering with GraphQL (query_name: {}) - cursor: {}".format(
-                    self.__str__(), query["name"], endCursor
+            start_time = time.time()
+            result = self._client.execute(gql(query))
+            logging.info(
+                "{}: Query {} execution_time: {}s items_returned: {} end_cursor: {}".format(  # noqa
+                    self.__str__(),
+                    query_dict["name"],
+                    round(time.time() - start_time, 2),
+                    len(result["projects"]["edges"]),
+                    result["projects"]["pageInfo"].get("endCursor"),
                 )
             )
-            return self._client.execute(
-                gql(query["body"] % (projectStatement, blobsPaths, titlesListMRs))
-            )
+            return result
         except aiohttp.client_exceptions.ClientResponseError:
             logging.warning(
-                "{}: Query {} - Returned 404".format(self.__str__(), query["name"])
+                "{}: Query {} - Returned 404".format(self.__str__(), query_dict["name"])
             )
             return {}
 
@@ -99,26 +110,30 @@ class GitlabProvider:
         gitlab.auth()
         return gitlab
 
-    def _get_g2s_projects(self, endCursor: str = "") -> Generator:
+    def _get_g2s_query(self, query: Dict[str, Any], endCursor: str = "") -> Generator:
         while True:
-            result = self._gql_client.query(GRAPHQL_PROJECTS_QUERY, endCursor)
+            result = self._gql_client.query(query, endCursor)
             if (
                 result
-                and result.get("projects", None)
-                and result["projects"].get("edges", None)
-                and len(result["projects"]["edges"])
+                and result.get(query["instance"], None)
+                and result[query["instance"]].get("edges", None)
+                and len(result[query["instance"]]["edges"])
             ):
-                yield result["projects"]["edges"]
+                yield result[query["instance"]]["edges"]
 
                 if (
                     result
-                    and result.get("projects", None)
-                    and result["projects"].get("pageInfo", None)
-                    and result["projects"]["pageInfo"].get("endCursor", None)
-                    and result["projects"]["pageInfo"]["endCursor"]
+                    and result.get(query["instance"], None)
+                    and result[query["instance"]].get("pageInfo", None)
+                    and result[query["instance"]]["pageInfo"].get("endCursor", None)
+                    and result[query["instance"]]["pageInfo"]["endCursor"]
                 ):
-                    endCursor = result["projects"]["pageInfo"]["endCursor"]
-            else:
+                    endCursor = result[query["instance"]]["pageInfo"]["endCursor"]
+            if not (
+                result
+                and result[query["instance"]].get("pageInfo")
+                and result[query["instance"]]["pageInfo"].get("hasNextPage")
+            ):
                 break
 
     def _get_or_create_branch(self, branch_name: str, project: Project) -> None:
@@ -217,7 +232,7 @@ class GitlabProvider:
             SENTRYCLIRC_BRANCH_NAME,
             SENTRYCLIRC_FILEPATH,
             SENTRYCLIRC_MR_CONTENT.format(sentry_url=SENTRY_URL),
-            SENTRYCLIRC_MR_TITLE.format(g2s_project.name),
+            SENTRYCLIRC_MR_TITLE.format(project_name=g2s_project.name),
             self._get_mr_msg(
                 SENTRYCLIRC_MR_DESCRIPTION, g2s_project.name_with_namespace
             ),
