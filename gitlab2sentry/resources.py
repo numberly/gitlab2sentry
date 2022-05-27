@@ -1,6 +1,7 @@
 import logging
 import os
 from collections import namedtuple
+from typing import Any, List, Tuple
 
 import yaml
 
@@ -74,9 +75,20 @@ G2SProject = namedtuple(
     ],
 )
 
+# Statistics configuration
+G2S_STATS: List[Tuple[str, List[Any]]] = [
+    ("not_in_g2s_cases", []),
+    ("mr_sentryclirc_waiting", []),
+    ("mr_dsn_waiting", []),
+    ("mr_disabled", []),
+    ("mr_sentryclirc_created", []),
+    ("mr_dsn_created", []),
+]
+
 # GraphQL Queries.
 GRAPHQL_PROJECTS_QUERY = {
-    "name": "OPENED_MRS_QUERY",
+    "name": "PROJECTS_QUERY",
+    "instance": "projects",
     "body": """
 {
     projects%s {
