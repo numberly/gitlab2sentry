@@ -83,6 +83,8 @@ G2S_STATS: List[Tuple[str, List[Any]]] = [
     ("mr_disabled", []),
     ("mr_sentryclirc_created", []),
     ("mr_dsn_created", []),
+    ("mr_sentryclirc_closed", []),
+    ("mr_dsn_closed", []),
 ]
 
 # GraphQL Queries.
