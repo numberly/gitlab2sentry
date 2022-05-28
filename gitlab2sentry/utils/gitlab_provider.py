@@ -21,6 +21,7 @@ from gitlab2sentry.resources import (
     GITLAB_GRAPHQL_SUFFIX,
     GITLAB_GRAPHQL_TIMEOUT,
     GITLAB_GROUP_IDENTIFIER,
+    GITLAB_MENTIONS_ACCESS_LEVEL,
     GITLAB_MENTIONS_LIST,
     GITLAB_RMV_SRC_BRANCH,
     GITLAB_TOKEN,
@@ -176,11 +177,21 @@ class GitlabProvider:
                 }
             )
 
-    def _get_mr_msg(self, msg: str, name_with_namespace: str) -> str:
+    def _get_default_mentions(self, project: Project) -> str:
+        return ", ".join(
+            [
+                f"@{member.username}"
+                for member in project.members.all()
+                if member.access_level >= GITLAB_MENTIONS_ACCESS_LEVEL
+            ]
+        )
+
+    def _get_mr_description(self, project: Project, msg: str, name_with_namespace: str) -> str:
+        mentions = self._get_default_mentions(project) if not GITLAB_MENTIONS_LIST else ", ".join(GITLAB_MENTIONS_LIST)
         return "\n".join(
             [
                 line.format(
-                    mentions=", ".join(GITLAB_MENTIONS_LIST),
+                    mentions=mentions,
                     name_with_namespace=name_with_namespace,
                 )
                 for line in msg.split("\n")
@@ -194,7 +205,6 @@ class GitlabProvider:
         file_path: str,
         content: str,
         title: str,
-        description: str,
     ) -> bool:
         try:
             project = self.gitlab.projects.get(g2s_project.pid)
@@ -202,7 +212,11 @@ class GitlabProvider:
             self._get_or_create_sentryclirc(project, branch_name, file_path, content)
             project.mergerequests.create(
                 {
-                    "description": description,
+                    "description": self._get_mr_description(
+                        project,
+                        SENTRYCLIRC_MR_DESCRIPTION,
+                        g2s_project.name_with_namespace
+                    ),
                     "remove_source_branch": GITLAB_RMV_SRC_BRANCH,
                     "source_branch": branch_name,
                     "target_branch": project.default_branch,
@@ -233,9 +247,6 @@ class GitlabProvider:
             SENTRYCLIRC_FILEPATH,
             SENTRYCLIRC_MR_CONTENT.format(sentry_url=SENTRY_URL),
             SENTRYCLIRC_MR_TITLE.format(project_name=g2s_project.name),
-            self._get_mr_msg(
-                SENTRYCLIRC_MR_DESCRIPTION, g2s_project.name_with_namespace
-            ),
         )
 
     def create_dsn_mr(self, g2s_project: G2SProject, dsn: str) -> bool:
@@ -250,5 +261,4 @@ class GitlabProvider:
             SENTRYCLIRC_FILEPATH,
             DSN_MR_CONTENT.format(sentry_url=SENTRY_URL, dsn=dsn),
             DSN_MR_TITLE.format(project_name=g2s_project.name),
-            self._get_mr_msg(DSN_MR_DESCRIPTION, g2s_project.name_with_namespace),
         )
