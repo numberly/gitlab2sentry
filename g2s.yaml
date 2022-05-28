@@ -36,8 +36,10 @@ gitlab:
       name: gitlab2sentry
       email: gitlab2sentry@numberly.com
     graphql_suffix: api/graphql
-    mentions:
-      - "@all"
+    # mentions:
+    #   - "@all"
+    # If mentions exist then access_level is not used
+    mentions_access_level: 40
     keyword: sentry
     remove_source: true
     group_identifier: team-
