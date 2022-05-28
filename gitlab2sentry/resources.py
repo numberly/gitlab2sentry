@@ -18,7 +18,7 @@ try:
     SENTRY_URL = os.getenv("SENTRY_URL")
     SENTRY_TOKEN = os.getenv("SENTRY_TOKEN")
     SENTRY_DSN = os.getenv("SENTRY_DSN")
-    SENTRY_ENV = os.getenv("SENTRY_ENV")
+    SENTRY_ENV = os.getenv("SENTRY_ENV", "production")
     SENTRY_ORG_SLUG = config["sentry"]["slug"]
 
     # DSN MR configuration.
