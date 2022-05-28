@@ -44,7 +44,8 @@ try:
     GITLAB_AUTHOR_EMAIL = config["gitlab"]["config"]["author"]["email"]
     GITLAB_AUTHOR_NAME = config["gitlab"]["config"]["author"]["name"]
     GITLAB_RMV_SRC_BRANCH = config["gitlab"]["config"]["remove_source"]
-    GITLAB_MENTIONS_LIST = config["gitlab"]["config"]["mentions"]
+    GITLAB_MENTIONS_LIST = config["gitlab"]["config"].get("mentions")
+    GITLAB_MENTIONS_ACCESS_LEVEL = int(config["gitlab"]["config"].get("mentions_access_level"))
     GITLAB_MR_KEYWORD = config["gitlab"]["config"]["keyword"]
     GITLAB_GROUP_IDENTIFIER = config["gitlab"]["config"]["group_identifier"]
 except TypeError as type_error:
