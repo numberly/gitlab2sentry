@@ -76,6 +76,7 @@ gitlab:
       - "@<mention>
       - # everyone you want to include on those MRs
     keyword: sentry
+    creation_days_limit: 60
     remove_source: true
     group_identifier: <define a keyword for the groups you want to include>
     graphql_aiohttp_timeout: 40
