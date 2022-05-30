@@ -41,14 +41,18 @@ try:
     GITLAB_GRAPHQL_SUFFIX = config["gitlab"]["config"]["graphql_suffix"]
     GITLAB_GRAPHQL_TIMEOUT = int(config["gitlab"]["config"]["graphql_aiohttp_timeout"])
     GITLAB_GRAPHQL_PAGE_LENGTH = int(config["gitlab"]["config"]["graphql_page_length"])
+    GITLAB_GROUP_IDENTIFIER = config["gitlab"]["config"].get("group_identifier", "")
     GITLAB_AUTHOR_EMAIL = config["gitlab"]["config"]["author"]["email"]
     GITLAB_AUTHOR_NAME = config["gitlab"]["config"]["author"]["name"]
-    GITLAB_PROJECT_CREATION_LIMIT = int(config["gitlab"]["config"].get("creation_days_limit", 0))
+    GITLAB_PROJECT_CREATION_LIMIT = int(
+        config["gitlab"]["config"].get("creation_days_limit", 0)
+    )
     GITLAB_RMV_SRC_BRANCH = config["gitlab"]["config"]["remove_source"]
     GITLAB_MENTIONS_LIST = config["gitlab"]["config"].get("mentions")
-    GITLAB_MENTIONS_ACCESS_LEVEL = int(config["gitlab"]["config"].get("mentions_access_level"))
+    GITLAB_MENTIONS_ACCESS_LEVEL = int(
+        config["gitlab"]["config"].get("mentions_access_level")
+    )
     GITLAB_MR_KEYWORD = config["gitlab"]["config"]["keyword"]
-    GITLAB_GROUP_IDENTIFIER = config["gitlab"]["config"]["group_identifier"]
 except TypeError as type_error:
     logging.error(
         "<Gitlab2Sentry>: g2s.yaml not configured properly - {}".format(str(type_error))
@@ -65,6 +69,7 @@ G2SProject = namedtuple(
     "G2SProject",
     [
         "pid",
+        "full_path",
         "name",
         "group",
         "mrs_enabled",
@@ -91,7 +96,7 @@ G2S_STATS: List[Tuple[str, List[Any]]] = [
 ]
 
 # GraphQL Queries.
-GRAPHQL_PROJECTS_QUERY = {
+GRAPHQL_LIST_PROJECTS_QUERY = {
     "name": "PROJECTS_QUERY",
     "instance": "projects",
     "body": """
@@ -100,6 +105,7 @@ GRAPHQL_PROJECTS_QUERY = {
         edges {
             node {
                 id
+                fullPath
                 name
                 createdAt
                 mergeRequestsEnabled
@@ -126,6 +132,40 @@ GRAPHQL_PROJECTS_QUERY = {
         pageInfo {
             endCursor
             hasNextPage
+        }
+    }
+}
+""",
+}
+
+GRAPHQL_FETCH_PROJECT_QUERY = {
+    "name": "PROJECTS_QUERY",
+    "instance": "projects",
+    "body": """
+{
+    project(fullPath: "%s") {
+        id
+        fullPath
+        name
+        createdAt
+        mergeRequestsEnabled
+        group {
+            name
+        }
+        repository {
+            blobs%s {
+                nodes {
+                    name
+                    rawTextBlob
+                }
+            }
+        }
+        mergeRequests%s {
+            nodes {
+                id
+                title
+                state
+            }
         }
     }
 }

@@ -1,6 +1,6 @@
-from datetime import datetime, timedelta
 import logging
 import time
+from datetime import datetime, timedelta
 from typing import Any, Dict, Generator, Optional
 
 import aiohttp
@@ -14,14 +14,12 @@ from gql.transport.aiohttp import log as websockets_logger
 from gitlab2sentry.resources import (
     DSN_BRANCH_NAME,
     DSN_MR_CONTENT,
-    DSN_MR_DESCRIPTION,
     DSN_MR_TITLE,
     GITLAB_AUTHOR_EMAIL,
     GITLAB_AUTHOR_NAME,
     GITLAB_GRAPHQL_PAGE_LENGTH,
     GITLAB_GRAPHQL_SUFFIX,
     GITLAB_GRAPHQL_TIMEOUT,
-    GITLAB_GROUP_IDENTIFIER,
     GITLAB_MENTIONS_ACCESS_LEVEL,
     GITLAB_MENTIONS_LIST,
     GITLAB_PROJECT_CREATION_LIMIT,
@@ -64,10 +62,33 @@ class GraphQLClient:
             },
         )
 
-    def query(self, query_dict: Dict[str, str], endCursor: str) -> Dict[str, Any]:
-        whereStatement = ' searchNamespaces: true search: "{}" sort: "createdAt"'.format(
-            GITLAB_GROUP_IDENTIFIER,
+    def _query(self, name: str, query: str) -> Dict[str, Any]:
+        try:
+            start_time = time.time()
+            result = self._client.execute(gql(query))
+            logging.info(
+                "{}: Query {} execution_time: {}s".format(  # noqa
+                    self.__str__(), name, round(time.time() - start_time, 2)
+                )
+            )
+            return result
+        except aiohttp.client_exceptions.ClientResponseError:
+            logging.warning("{}: Query {} - Returned 404".format(self.__str__(), name))
+            return {}
+
+    def project_fetch_query(self, query_dict: Dict[str, str]):
+        project_full_path = f"{query_dict['full_path']}"
+        blobsPaths = '(paths: "{}")'.format(SENTRYCLIRC_FILEPATH)
+        titlesListMRs = '(sourceBranches: ["{}","{}"])'.format(
+            SENTRYCLIRC_BRANCH_NAME, DSN_BRANCH_NAME
         )
+        query = query_dict["body"] % (project_full_path, blobsPaths, titlesListMRs)
+        return self._query(query_dict["name"], query)
+
+    def project_list_query(
+        self, query_dict: Dict[str, str], endCursor: str
+    ) -> Dict[str, Any]:
+        whereStatement = ' searchNamespaces: true sort: "createdAt_desc"'
         edgesStatement = "(first: {}{}{})".format(
             GITLAB_GRAPHQL_PAGE_LENGTH,
             f' after: "{endCursor}"' if endCursor else "",
@@ -78,24 +99,7 @@ class GraphQLClient:
             SENTRYCLIRC_BRANCH_NAME, DSN_BRANCH_NAME
         )
         query = query_dict["body"] % (edgesStatement, blobsPaths, titlesListMRs)
-        try:
-            start_time = time.time()
-            result = self._client.execute(gql(query))
-            logging.info(
-                "{}: Query {} execution_time: {}s items_returned: {} end_cursor: {}".format(  # noqa
-                    self.__str__(),
-                    query_dict["name"],
-                    round(time.time() - start_time, 2),
-                    len(result["projects"]["edges"]),
-                    result["projects"]["pageInfo"].get("endCursor"),
-                )
-            )
-            return result
-        except aiohttp.client_exceptions.ClientResponseError:
-            logging.warning(
-                "{}: Query {} - Returned 404".format(self.__str__(), query_dict["name"])
-            )
-            return {}
+        return self._query(query_dict["name"], query)
 
 
 class GitlabProvider:
@@ -121,11 +125,14 @@ class GitlabProvider:
             return None
 
     def _from_iso_to_datetime(self, datetime_str: str) -> datetime:
-        return datetime.strptime(datetime_str, '%Y-%m-%dT%H:%M:%SZ')
+        return datetime.strptime(datetime_str, "%Y-%m-%dT%H:%M:%SZ")
 
-    def _get_g2s_query(self, query: Dict[str, Any], endCursor: str = "") -> Generator:
+    def get_project(self, query: Dict[str, Any]):
+        return self._gql_client.project_fetch_query(query)
+
+    def get_all_projects(self, query: Dict[str, Any], endCursor: str = "") -> Generator:
         while True:
-            result = self._gql_client.query(query, endCursor)
+            result = self._gql_client.project_list_query(query, endCursor)
             if (
                 result
                 and result.get(query["instance"], None)
@@ -135,13 +142,14 @@ class GitlabProvider:
                 result_nodes = result[query["instance"]]["edges"]
                 # Check the last item of the ordered list to se its creation
                 createdAt = self._from_iso_to_datetime(
-                    result_nodes[len(result_nodes)-1]["node"]["createdAt"]
+                    result_nodes[len(result_nodes) - 1]["node"]["createdAt"]
                 )
                 if self.update_limit and createdAt < self.update_limit:
                     yield [
-                        node for node in result_nodes
-                        if self._from_iso_to_datetime(
-                            node["node"]["createdAt"]) >= self.update_limit
+                        node
+                        for node in result_nodes
+                        if self._from_iso_to_datetime(node["node"]["createdAt"])
+                        >= self.update_limit
                     ]
                     break
                 else:
@@ -211,8 +219,14 @@ class GitlabProvider:
             ]
         )
 
-    def _get_mr_description(self, project: Project, msg: str, name_with_namespace: str) -> str:
-        mentions = self._get_default_mentions(project) if not GITLAB_MENTIONS_LIST else ", ".join(GITLAB_MENTIONS_LIST)
+    def _get_mr_description(
+        self, project: Project, msg: str, name_with_namespace: str
+    ) -> str:
+        mentions = (
+            self._get_default_mentions(project)
+            if not GITLAB_MENTIONS_LIST
+            else ", ".join(GITLAB_MENTIONS_LIST)
+        )
         return "\n".join(
             [
                 line.format(
@@ -240,7 +254,7 @@ class GitlabProvider:
                     "description": self._get_mr_description(
                         project,
                         SENTRYCLIRC_MR_DESCRIPTION,
-                        g2s_project.name_with_namespace
+                        g2s_project.name_with_namespace,
                     ),
                     "remove_source_branch": GITLAB_RMV_SRC_BRANCH,
                     "source_branch": branch_name,

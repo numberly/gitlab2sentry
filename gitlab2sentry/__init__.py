@@ -11,7 +11,8 @@ from gitlab2sentry.resources import (
     GITLAB_GROUP_IDENTIFIER,
     GITLAB_TOKEN,
     GITLAB_URL,
-    GRAPHQL_PROJECTS_QUERY,
+    GRAPHQL_FETCH_PROJECT_QUERY,
+    GRAPHQL_LIST_PROJECTS_QUERY,
     SENTRY_ORG_SLUG,
     SENTRY_TOKEN,
     SENTRY_URL,
@@ -133,7 +134,7 @@ class Gitlab2Sentry:
         return sentryclirc_mr_state, dsn_mr_state
 
     def _is_group_project(self, group: Optional[Dict[str, Any]]) -> bool:
-        if group and group.get("name") and (GITLAB_GROUP_IDENTIFIER in group["name"]):
+        if group and group.get("name"):
             return True
         else:
             return False
@@ -159,25 +160,25 @@ class Gitlab2Sentry:
         return g2s_project.has_sentryclirc_file and g2s_project.has_dsn
 
     def _get_g2s_project(self, result: Dict[str, Any]) -> Optional[G2SProject]:
-        if result["node"].get("repository"):
-            group_name = result["node"]["group"]["name"]
-            project_name = result["node"]["name"]
-            created_at = result["node"]["createdAt"]
-            mrs_enabled = result["node"]["mergeRequestsEnabled"]
-            id_url = result["node"]["id"].split("/")[
-                len(result["node"]["id"].split("/")) - 1
-            ]
+        if result.get("repository"):
+            group_name = result["group"]["name"]
+            full_path = result["fullPath"]
+            project_name = result["name"]
+            created_at = result["createdAt"]
+            mrs_enabled = result["mergeRequestsEnabled"]
+            id_url = result["id"].split("/")[len(result["id"].split("/")) - 1]
             sentryclirc_mr_state, dsn_mr_state = self._get_mr_states(
-                result["node"]["name"], result["node"]["mergeRequests"]["nodes"]
+                result["name"], result["mergeRequests"]["nodes"]
             )
             has_sentryclirc_file, has_dsn = self._get_sentryclirc_file(
-                result["node"]["repository"]["blobs"]["nodes"]
+                result["repository"]["blobs"]["nodes"]
             )
             name_with_namespace = "{} / {}".format(group_name, project_name)
             path_with_namespace = "{}/{}".format(group_name, project_name)
             pid = int(id_url.split("/")[len(id_url.split("/")) - 1])
             return G2SProject(
                 pid,
+                full_path,
                 project_name,
                 group_name,
                 mrs_enabled,
@@ -198,7 +199,7 @@ class Gitlab2Sentry:
                 self.__str__(), GITLAB_URL, GITLAB_GRAPHQL_SUFFIX
             )
         )
-        request_gen = self.gitlab_provider._get_g2s_query(GRAPHQL_PROJECTS_QUERY)
+        request_gen = self.gitlab_provider.get_all_projects(GRAPHQL_LIST_PROJECTS_QUERY)
         page_results = [page for page in request_gen]
         logging.info(
             "{}: Fetched {} pages. Total time: {} seconds".format(
@@ -209,25 +210,38 @@ class Gitlab2Sentry:
         )
         return page_results
 
+    def _get_gitlab_project(self, full_path: str) -> Optional[G2SProject]:
+        GRAPHQL_FETCH_PROJECT_QUERY["full_path"] = full_path
+        logging.info(
+            "{}: Starting querying for specific Gitlab project with Graphql at {}/{}".format(  # noqa
+                self.__str__(), GITLAB_URL, GITLAB_GRAPHQL_SUFFIX
+            )
+        )
+        result = self.gitlab_provider.get_project(GRAPHQL_FETCH_PROJECT_QUERY)
+        return (
+            self._get_g2s_project(result.get("result"))
+            if result.get("project")
+            else None
+        )
+
     def _get_gitlab_groups(self):
         groups = dict()
         valid_projects = 0
         for page_result in self._get_paginated_projects():
-            for result in page_result:
-                if self._is_group_project(result["node"]["group"]):
-                    group_name = result["node"]["group"]["name"]
+            for result_node in page_result:
+                result = result_node["node"]
+                if self._is_group_project(result["group"]):
+                    group_name = result["fullPath"].split("/")[0]
+                    if group_name.startswith(GITLAB_GROUP_IDENTIFIER):
+                        g2s_project = self._get_g2s_project(result)
 
-                    g2s_project = self._get_g2s_project(result)
-
-                    if g2s_project:
-                        if not groups.get(group_name):
-                            groups[group_name] = list()
-                        groups[group_name].append(g2s_project)
-                        valid_projects +=1
+                        if g2s_project:
+                            if not groups.get(group_name):
+                                groups[group_name] = list()
+                            groups[group_name].append(g2s_project)
+                            valid_projects += 1
         logging.info(
-            "{}: Total filtered projects: {}".format(
-                self.__str__(), valid_projects
-            )
+            "{}: Total filtered projects: {}".format(self.__str__(), valid_projects)
         )
         return groups
 
@@ -256,7 +270,9 @@ class Gitlab2Sentry:
             )
         return None
 
-    def update(self) -> None:
+    def _handle_g2s_project(
+        self, g2s_project: G2SProject, sentry_group_name: str
+    ) -> None:
         """
         Creates sentry project for all given gitlab projects. It
         follows a two steps process.
@@ -279,77 +295,99 @@ class Gitlab2Sentry:
             6. Project has no .sentryclirc file and no MR for
                 this. Create the sentryclirc file [create]
         """
-        groups = self._get_gitlab_groups()
+        if self._has_already_sentry(g2s_project):
+            return None
 
-        for group_name in groups.keys():
-            sentry_group_name = group_name.split("/")[0].strip()
-            self._ensure_sentry_group(group_name, sentry_group_name)
-            for g2s_project in groups[group_name]:
-                # Skip if sentry is installed or
-                # Project has disabled MRs
-                if self._has_already_sentry(g2s_project):
-                    continue
+        if not self._has_mrs_enabled(g2s_project):
+            return None
 
-                if not self._has_mrs_enabled(g2s_project):
-                    continue
+        # Case sentryclirc found but
+        # dsn not found: Pending MR
+        elif g2s_project.has_sentryclirc_file and not g2s_project.has_dsn:
+            if self._opened_dsn_mr_found(g2s_project):
+                return None
+            else:
+                sentry_project = self._create_sentry_project(
+                    g2s_project.path_with_namespace,
+                    sentry_group_name,
+                )
 
-                # Case sentryclirc found but
-                # dsn not found: Pending MR
-                elif g2s_project.has_sentryclirc_file and not g2s_project.has_dsn:
-                    if self._opened_dsn_mr_found(g2s_project):
-                        continue
-                    else:
-                        sentry_project = self._create_sentry_project(
-                            g2s_project.path_with_namespace,
-                            sentry_group_name,
-                        )
+                # If Sentry fails to create project skip
+                if not sentry_project:
+                    return None
 
-                        # If Sentry fails to create project skip
-                        if not sentry_project:
-                            continue
+                dsn = self.sentry_provider.set_rate_limit_for_key(
+                    sentry_project["slug"]
+                )
 
-                        dsn = self.sentry_provider.set_rate_limit_for_key(
-                            sentry_project["slug"]
-                        )
+                # If fetch of dsn failed skip
+                if not dsn:
+                    return None
 
-                        # If fetch of dsn failed skip
-                        if not dsn:
-                            continue
-
-                        mr_created = self.gitlab_provider.create_dsn_mr(
-                            g2s_project, dsn
-                        )
-                        if mr_created:
-                            self.run_stats["mr_dsn_created"].append(
-                                g2s_project.path_with_namespace
-                            )
-
-                # Case sentryclirc not found:
-                # Declined sentryclirc MR or
-                # need to create one
-                elif not g2s_project.has_sentryclirc_file:
-                    if self._opened_sentryclirc_mr_found(
-                        g2s_project
-                    ) or self._closed_sentryclirc_mr_found(g2s_project):
-                        continue
-                    else:
-                        mr_created = self.gitlab_provider.create_sentryclirc_mr(
-                            g2s_project
-                        )
-                        if mr_created:
-                            self.run_stats["mr_sentryclirc_created"].append(
-                                g2s_project.path_with_namespace
-                            )
-
-                else:
-                    logging.info(
-                        "{}: Project {} not included in Gitlab2Sentry cases".format(
-                            self.__str__(), g2s_project.path_with_namespace
-                        )
-                    )
-                    self.run_stats["not_in_g2s_cases"].append(
+                mr_created = self.gitlab_provider.create_dsn_mr(g2s_project, dsn)
+                if mr_created:
+                    self.run_stats["mr_dsn_created"].append(
                         g2s_project.path_with_namespace
                     )
+
+        # Case sentryclirc not found:
+        # Declined sentryclirc MR or
+        # need to create one
+        elif not g2s_project.has_sentryclirc_file:
+            if self._opened_sentryclirc_mr_found(
+                g2s_project
+            ) or self._closed_sentryclirc_mr_found(g2s_project):
+                return None
+            else:
+                mr_created = self.gitlab_provider.create_sentryclirc_mr(g2s_project)
+                if mr_created:
+                    self.run_stats["mr_sentryclirc_created"].append(
+                        g2s_project.path_with_namespace
+                    )
+
+        else:
+            logging.info(
+                "{}: Project {} not included in Gitlab2Sentry cases".format(
+                    self.__str__(), g2s_project.path_with_namespace
+                )
+            )
+            self.run_stats["not_in_g2s_cases"].append(g2s_project.path_with_namespace)
+
+    def update(self, **kwargs) -> None:
+        """
+        kwargs: full_path
+        description: Full path of project (e.g. my-team/my-project)
+
+        If the fullPath of a specific project is given it will run
+        the script only for this project.
+
+        If no full_path is provided it will run the script. If
+        creation_days_limit is provided it will fetch all projects
+        created after this period. If no it will fetch every project
+        """
+        full_path = kwargs.get("full_path", None)
+        if full_path:
+            g2s_project = self._get_gitlab_project(full_path)
+            if g2s_project:
+                sentry_group_name = g2s_project.group.split("/")[0].strip()
+                self._handle_g2s_project(g2s_project, sentry_group_name)  # type: ignore
+            else:
+                logging.info(
+                    "{}: Project with fullPath - {} not found".format(
+                        self.__str__(), full_path
+                    )
+                )
+        # If no kwarg is given fetch all
+        else:
+            groups = self._get_gitlab_groups()
+
+            for group_name in groups.keys():
+                sentry_group_name = group_name.split("/")[0].strip()
+                self._ensure_sentry_group(group_name, sentry_group_name)
+                for g2s_project in groups[group_name]:
+                    # Skip if sentry is installed or
+                    # Project has disabled MRs
+                    self._handle_g2s_project(g2s_project, sentry_group_name)  # type: ignore
 
         for key in self.run_stats.keys():
             logging.info(
