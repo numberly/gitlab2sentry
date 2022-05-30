@@ -43,6 +43,7 @@ try:
     GITLAB_GRAPHQL_PAGE_LENGTH = int(config["gitlab"]["config"]["graphql_page_length"])
     GITLAB_AUTHOR_EMAIL = config["gitlab"]["config"]["author"]["email"]
     GITLAB_AUTHOR_NAME = config["gitlab"]["config"]["author"]["name"]
+    GITLAB_PROJECT_CREATION_LIMIT = int(config["gitlab"]["config"].get("creation_days_limit", 0))
     GITLAB_RMV_SRC_BRANCH = config["gitlab"]["config"]["remove_source"]
     GITLAB_MENTIONS_LIST = config["gitlab"]["config"].get("mentions")
     GITLAB_MENTIONS_ACCESS_LEVEL = int(config["gitlab"]["config"].get("mentions_access_level"))
@@ -67,6 +68,7 @@ G2SProject = namedtuple(
         "name",
         "group",
         "mrs_enabled",
+        "created_at",
         "name_with_namespace",
         "path_with_namespace",
         "has_sentryclirc_file",
@@ -99,6 +101,7 @@ GRAPHQL_PROJECTS_QUERY = {
             node {
                 id
                 name
+                createdAt
                 mergeRequestsEnabled
                 group {
                     name
