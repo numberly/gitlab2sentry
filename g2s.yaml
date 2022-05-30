@@ -40,6 +40,7 @@ gitlab:
     #   - "@all"
     # If mentions exist then access_level is not used
     mentions_access_level: 40
+    creation_days_limit: 60
     keyword: sentry
     remove_source: true
     group_identifier: team-
