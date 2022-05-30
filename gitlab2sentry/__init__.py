@@ -162,6 +162,7 @@ class Gitlab2Sentry:
         if result["node"].get("repository"):
             group_name = result["node"]["group"]["name"]
             project_name = result["node"]["name"]
+            created_at = result["node"]["createdAt"]
             mrs_enabled = result["node"]["mergeRequestsEnabled"]
             id_url = result["node"]["id"].split("/")[
                 len(result["node"]["id"].split("/")) - 1
@@ -180,6 +181,7 @@ class Gitlab2Sentry:
                 project_name,
                 group_name,
                 mrs_enabled,
+                created_at,
                 name_with_namespace,
                 path_with_namespace,
                 has_sentryclirc_file,
@@ -209,6 +211,7 @@ class Gitlab2Sentry:
 
     def _get_gitlab_groups(self):
         groups = dict()
+        valid_projects = 0
         for page_result in self._get_paginated_projects():
             for result in page_result:
                 if self._is_group_project(result["node"]["group"]):
@@ -219,8 +222,13 @@ class Gitlab2Sentry:
                     if g2s_project:
                         if not groups.get(group_name):
                             groups[group_name] = list()
-
                         groups[group_name].append(g2s_project)
+                        valid_projects +=1
+        logging.info(
+            "{}: Total filtered projects: {}".format(
+                self.__str__(), valid_projects
+            )
+        )
         return groups
 
     def _create_sentry_project(
