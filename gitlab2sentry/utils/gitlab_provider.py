@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 import logging
 import time
 from typing import Any, Dict, Generator, Optional
@@ -23,6 +24,7 @@ from gitlab2sentry.resources import (
     GITLAB_GROUP_IDENTIFIER,
     GITLAB_MENTIONS_ACCESS_LEVEL,
     GITLAB_MENTIONS_LIST,
+    GITLAB_PROJECT_CREATION_LIMIT,
     GITLAB_RMV_SRC_BRANCH,
     GITLAB_TOKEN,
     GITLAB_URL,
@@ -63,8 +65,8 @@ class GraphQLClient:
         )
 
     def query(self, query_dict: Dict[str, str], endCursor: str) -> Dict[str, Any]:
-        whereStatement = ' searchNamespaces: true search: "{}"'.format(
-            GITLAB_GROUP_IDENTIFIER
+        whereStatement = ' searchNamespaces: true search: "{}" sort: "createdAt"'.format(
+            GITLAB_GROUP_IDENTIFIER,
         )
         edgesStatement = "(first: {}{}{})".format(
             GITLAB_GRAPHQL_PAGE_LENGTH,
@@ -102,6 +104,7 @@ class GitlabProvider:
     ) -> None:
         self.gitlab = self._get_gitlab(url, token)
         self._gql_client = GraphQLClient(url, token)
+        self.update_limit = self._get_update_limit()
 
     def __str__(self):
         return "<GitlabProvider>"
@@ -110,6 +113,15 @@ class GitlabProvider:
         gitlab = Gitlab(url, private_token=token)
         gitlab.auth()
         return gitlab
+
+    def _get_update_limit(self) -> Optional[datetime]:
+        if GITLAB_PROJECT_CREATION_LIMIT:
+            return datetime.now() - timedelta(days=GITLAB_PROJECT_CREATION_LIMIT)
+        else:
+            return None
+
+    def _from_iso_to_datetime(self, datetime_str: str) -> datetime:
+        return datetime.strptime(datetime_str, '%Y-%m-%dT%H:%M:%SZ')
 
     def _get_g2s_query(self, query: Dict[str, Any], endCursor: str = "") -> Generator:
         while True:
@@ -120,7 +132,20 @@ class GitlabProvider:
                 and result[query["instance"]].get("edges", None)
                 and len(result[query["instance"]]["edges"])
             ):
-                yield result[query["instance"]]["edges"]
+                result_nodes = result[query["instance"]]["edges"]
+                # Check the last item of the ordered list to se its creation
+                createdAt = self._from_iso_to_datetime(
+                    result_nodes[len(result_nodes)-1]["node"]["createdAt"]
+                )
+                if self.update_limit and createdAt < self.update_limit:
+                    yield [
+                        node for node in result_nodes
+                        if self._from_iso_to_datetime(
+                            node["node"]["createdAt"]) >= self.update_limit
+                    ]
+                    break
+                else:
+                    yield result_nodes
 
                 if (
                     result
