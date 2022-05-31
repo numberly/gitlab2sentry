@@ -22,9 +22,12 @@ push: build
 qa:
 	isort --profile black . && black . && flake8
 
+mypy:
+	mypy gitlab2sentry/ --config-file .mypy.ini --ignore-missing-imports
+
 run:
 	# needed env: GITLAB_TOKEN + SENTRY_TOKEN
-	python3 main.py
+	python3 gitlab2sentry/run.py
 
 upgrade: push
 	helm -n team-infrastructure upgrade -f helm/values-production.yaml --set cronjob.imageTag=$(TAG) gitlab2sentry ./helm
