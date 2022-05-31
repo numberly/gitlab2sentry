@@ -41,8 +41,6 @@ class Gitlab2Sentry:
         return "<Gitlab2Sentry>"
 
     def _get_gitlab_provider(self) -> GitlabProvider:
-        logging.info(f"TOKEN: {GITLAB_TOKEN}")
-        logging.info(f"URL: {GITLAB_URL}")
         return GitlabProvider(GITLAB_URL, GITLAB_TOKEN)
 
     def _get_sentry_provider(self) -> SentryProvider:
