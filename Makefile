@@ -30,4 +30,4 @@ run:
 	python3 gitlab2sentry/run.py
 
 upgrade: push
-	helm -n team-infrastructure upgrade -f helm/values-production.yaml --set cronjob.imageTag=$(TAG) gitlab2sentry ./helm
+	helm secrets -d vault -n team-infrastructure upgrade -f helm/values-production.yaml --set cronjob.imageTag=$(TAG) gitlab2sentry ./helm
