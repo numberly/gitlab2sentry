@@ -3,6 +3,10 @@ global:
   app: gitlab2sentry
   namespace: team-infrastructure
 
+secret:
+  GITLAB_TOKEN: !vault secrets/team-infrastructure/production/gitlab2sentry#gitlab_api_key
+  SENTRY_TOKEN: !vault secrets/team-infrastructure/production/gitlab2sentry#sentry_token
+
 cronjob:
   image: "registry.numberly.in/team-infrastructure/gitlab2sentry"
   imagePullPolicy: "IfNotPresent"
