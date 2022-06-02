@@ -130,11 +130,11 @@ class SentryProvider:
 
         if status_code == 201:
             logging.info(
-                "{}: Creating sentry project {}".format(self.__str__(), project_name)
+                "{}: [Creating] Sentry project {}".format(self.__str__(), project_name)
             )
         elif status_code == 200:
             logging.info(
-                "{}: Sentry project {} exists".format(self.__str__(), project_name)
+                "{}: [Skipping] Sentry project {} exists".format(self.__str__(), project_name)
             )
         else:
             raise SentryProjectCreationFailed(result)
@@ -170,7 +170,7 @@ class SentryProvider:
             )
         except SentryProjectKeyIDNotFound as key_id_err:
             logging.warning(
-                "{}: Project {} sentry key id not found: {}".format(
+                "{}: Project {} - Sentry key id not found: {}".format(
                     self.__str__(),
                     project_slug,
                     key_id_err,
