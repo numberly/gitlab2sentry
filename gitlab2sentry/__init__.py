@@ -304,7 +304,10 @@ class Gitlab2Sentry:
         # Case sentryclirc found but
         # dsn not found: Pending MR
         elif g2s_project.has_sentryclirc_file and not g2s_project.has_dsn:
-            if self._opened_dsn_mr_found(g2s_project):
+            if (
+                self._opened_dsn_mr_found(g2s_project)
+                or self._closed_dsn_mr_found(g2s_project)
+            ):
                 return None
             else:
                 sentry_project = self._create_sentry_project(
