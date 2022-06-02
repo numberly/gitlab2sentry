@@ -193,10 +193,10 @@ class GitlabProvider:
             f.save(branch=branch_name, commit_message=SENTRYCLIRC_COM_MSG)
         except GitlabGetError:
             logging.info(
-                "{}: {} file not found for project {}. Creating".format(
+                "{}: [Creating] Project {} - File not found for project {}.".format(
                     self.__str__(),
                     SENTRYCLIRC_FILEPATH,
-                    project.path_with_namespace,
+                    project.full_path,
                 )
             )
             f = project.files.create(
@@ -265,9 +265,9 @@ class GitlabProvider:
             return True
         except Exception as err:
             logging.warning(
-                "{}: Project {} failed to create MR ({}): {}".format(
+                "{}: Project {} - Failed to create MR ({}): {}".format(
                     self.__str__(),
-                    g2s_project.path_with_namespace,
+                    g2s_project.full_path,
                     branch_name,
                     str(err),
                 )
@@ -276,8 +276,8 @@ class GitlabProvider:
 
     def create_sentryclirc_mr(self, g2s_project: G2SProject) -> bool:
         logging.info(
-            "{}: Project {} needs sentry .sentryclirc MR".format(
-                self.__str__(), g2s_project.path_with_namespace
+            "{}: [Creating] Project {} - Needs sentry .sentryclirc MR.".format(
+                self.__str__(), g2s_project.full_path
             )
         )
         return self._create_mr(
@@ -290,8 +290,8 @@ class GitlabProvider:
 
     def create_dsn_mr(self, g2s_project: G2SProject, dsn: str) -> bool:
         logging.info(
-            "{}: Project {} sentry dsn: {}. Opening dsn MR".format(
-                self.__str__(), g2s_project.path_with_namespace, dsn
+            "{}: [Creating] Project {} - Sentry dsn: {}. Needs dsn MR.".format(
+                self.__str__(), g2s_project.full_path, dsn
             )
         )
         return self._create_mr(

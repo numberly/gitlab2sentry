@@ -75,7 +75,6 @@ G2SProject = namedtuple(
         "mrs_enabled",
         "created_at",
         "name_with_namespace",
-        "path_with_namespace",
         "has_sentryclirc_file",
         "has_dsn",
         "sentryclirc_mr_state",
@@ -84,15 +83,15 @@ G2SProject = namedtuple(
 )
 
 # Statistics configuration
-G2S_STATS: List[Tuple[str, List[Any]]] = [
-    ("not_in_g2s_cases", []),
-    ("mr_sentryclirc_waiting", []),
-    ("mr_dsn_waiting", []),
-    ("mr_disabled", []),
-    ("mr_sentryclirc_created", []),
-    ("mr_dsn_created", []),
-    ("mr_sentryclirc_closed", []),
-    ("mr_dsn_closed", []),
+G2S_STATS: List[Tuple[str, int]] = [
+    ("not_in_g2s_cases", 0),
+    ("mr_sentryclirc_waiting", 0),
+    ("mr_dsn_waiting", 0),
+    ("mr_disabled", 0),
+    ("mr_sentryclirc_created", 0),
+    ("mr_dsn_created", 0),
+    ("mr_sentryclirc_closed", 0),
+    ("mr_dsn_closed", 0),
 ]
 
 # GraphQL Queries.
