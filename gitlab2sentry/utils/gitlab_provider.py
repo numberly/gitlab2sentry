@@ -185,7 +185,7 @@ class GitlabProvider:
         project.branches.create({"branch": branch_name, "ref": project.default_branch})
 
     def _get_or_create_sentryclirc(
-        self, project: Project, branch_name: str, file_path: str, content: str
+        self, project: Project, full_path: str, branch_name: str, file_path: str, content: str
     ) -> None:
         try:
             f = project.files.get(file_path=file_path, ref=project.default_branch)
@@ -196,7 +196,7 @@ class GitlabProvider:
                 "{}: [Creating] Project {} - File not found for project {}.".format(
                     self.__str__(),
                     SENTRYCLIRC_FILEPATH,
-                    project.full_path,
+                    full_path,
                 )
             )
             f = project.files.create(
@@ -248,7 +248,7 @@ class GitlabProvider:
         try:
             project = self.gitlab.projects.get(g2s_project.pid)
             self._get_or_create_branch(branch_name, project)
-            self._get_or_create_sentryclirc(project, branch_name, file_path, content)
+            self._get_or_create_sentryclirc(project, g2s_project.full_path, branch_name, file_path, content)
             project.mergerequests.create(
                 {
                     "description": self._get_mr_description(
