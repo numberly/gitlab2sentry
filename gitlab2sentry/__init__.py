@@ -308,7 +308,6 @@ class Gitlab2Sentry:
             else:
                 sentry_project = self._create_sentry_project(
                     g2s_project.full_path,
-                    g2s_project.full_path,
                     sentry_group_name,
                 )
 
