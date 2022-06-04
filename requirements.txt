@@ -15,7 +15,7 @@ requests==2.24.0
 requests-toolbelt==0.9.1
 sentry-sdk==0.19.5
 types-python-slugify==5.0.4
-types-PyYAML==6.0.7
-types-requests==2.27.27
+types-PyYAML==6.0.8
+types-requests==2.27.30
 Unidecode==0.4.21
 urllib3==1.25.11
