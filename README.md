@@ -1,24 +1,25 @@
 # gitlab2sentry
 
-This project aims to automate Sentry project creation. Moreover it aims to create a sentry project for every gitlab team's project.
+Getting a Sentry project for each of your Gitlab repositories is just one MR merge away!
 
-The script aims to add sentry for every new project you have created.
+Gitlab2Sentry will create a Sentry project associated to each of your Gitlab repositories using a Merge Request based automated workflow.
 
+Any new Gitlab repository you create will be offered a Sentry project if you accept (merge the proposal MR) it with respect to the Gitlab group owning it!
 
 ## Two-Steps process
 
-1. After creating your new project, in your gitlab, ```gitlab2sentry``` will create the first Pull Request. This pull request will contain the creation of the ```.sentryclirc``` file. Although, it will not contain the ```DSN``` for this project and no project will be created to ```sentry```
+1. After creating your new project on Gitlab, ```gitlab2sentry``` will create a first Merge Request asking if you want it to create an associated Sentry project for it. This Merge Request will contain the creation of a ```.sentryclirc``` file which, if you merge it, will be contributed back the newly created Sentry project ```DSN``` for this project.
 
-2. Once the user has merged the first Pull request, ```gitlab2sentry``` will create the second Pull Request. This pull request will update the newly created ```.sentryclirc``` file with the ```DSN``` of the sentry project. Moreover, after the merge of the first Pull Request ```gitlabsentry``` will create a new ```sentry project```, update its rate limit and save the ```DSN``` inside ```.sentryclirc```. Once the user has merged the second pull request everything will be set up.
+2. If you merged the first Merge Request, ```gitlab2sentry``` will create a second one to update the newly created ```.sentryclirc``` file with the ```DSN``` of the sentry project. Moreover, after the merge of the first Merge Request ```gitlabsentry``` will create a new ```sentry project```, update its rate limit and save the ```DSN``` inside ```.sentryclirc```. Once you have merged this second Merge Request everything will be set up!
 
-**NOTE**: ```Gitlab2Sentry``` looks only for group projects and searches for PRs having specific keyword inside (check "Configuration" section)
+**NOTE**: ```Gitlab2Sentry``` looks only for group projects and searches for MRs having specific keyword inside (check "Configuration" section)
 
 
 ## Run locally
 
-You can install all requirements for this project with
+You can install all requirements for this project with:
 
-```
+```bash
 python3 -m venv venv
 pip3 install -r requirements.txt
 source venv/bin/ac
@@ -26,7 +27,7 @@ source venv/bin/ac
 
 After the installation of all requirements you have to:
 
-```
+```bash
 export SENTRY_URL=<your sentry's url>
 export SENTRY_TOKEN=<your sentry token>
 export SENTRY_ENV=<your environment - default production>
@@ -41,7 +42,7 @@ We prefer to deploy and manage ```gitlab2sentry``` with ```helm```. Inside ```he
 
 You can upgrade your deployment with:
 
-```
+```bash
 make upgrade
 ```
 
@@ -51,10 +52,11 @@ make upgrade
 
 1. First of all you have to configure the ```g2s.yaml``` file where everything is configured for the ```gitlab2sentry``` service. Here you can find a description for every field:
 
-```
+```yaml
 sentry:
   # Sentry configuration.
   slug: <your sentry organization>
+
 gitlab:
   # DSN PR configuration.
   dsn_mr:
@@ -67,6 +69,7 @@ gitlab:
     description: <your description in the DSN PR>
     branch_name: <default dsn branch name>
     title: <default title of the dsn mr>
+
   # Sentryclirc PR configuration.
   sentryclirc_mr:
     # Default values for .sentryclirc (1st) pull request configuration.
@@ -79,6 +82,7 @@ gitlab:
     filepath: .sentryclirc
     commit_message: <commit message>
     title: <default title of the sentryclirc mr>
+
   # Gitlab configuration.
   config:
     author:
@@ -110,3 +114,10 @@ gitlab:
 2. If you want to follow the ```helm``` deployment process you will have to fill your details into the ```helm/values-production.yaml``` and ```helm/Chart.yaml```.
 
 3. You can update ```REG ?= your-registry``` and ```NS	?= your-namespace``` values inside ```Makefile```.
+
+## Contributions & comments welcomed
+
+Numberly decided to Open Source this project because it saves a lot of time internally to all our developers and helped foster the mass adoption of Sentry in all our Tech teams. We hope this project can benefit someone else.
+
+Feel free to ask questions, suggest improvements and of course contribute features or fixes you might need!
+
