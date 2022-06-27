@@ -21,7 +21,7 @@ You can install all requirements for this project with
 ```
 python3 -m venv venv
 pip3 install -r requirements.txt
-source venv/bin/ac
+source venv/bin/activate
 ```
 
 After the installation of all requirements you have to:
