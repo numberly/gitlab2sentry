@@ -378,8 +378,8 @@ class Gitlab2Sentry:
                     # Skip if sentry is installed or
                     # Project has disabled MRs
                     self._handle_g2s_project(
-                        g2s_project, sentry_group_name
-                    )  # type: ignore
+                        g2s_project, sentry_group_name  # type: ignore
+                    )
 
         for key in self.run_stats.keys():
             logging.info(
