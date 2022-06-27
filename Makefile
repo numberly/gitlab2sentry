@@ -11,6 +11,9 @@ build:
 push: build
 	docker push $(IMG):$(TAG)
 
+test:
+	ENV="test" pytest
+
 qa:
 	isort --profile black . && black . && flake8
 

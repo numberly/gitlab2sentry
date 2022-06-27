@@ -145,4 +145,15 @@ def test_get_all_projects(
                 }
             },
         ],
-    ) == 1
+    )
+    assert (
+        len(
+            [
+                result_page
+                for result_page in gitlab_provider_fixture.get_all_projects(
+                    GRAPHQL_LIST_PROJECTS_QUERY
+                )
+            ]
+        )
+        == 1
+    )
