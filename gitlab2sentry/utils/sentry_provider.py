@@ -42,12 +42,15 @@ class SentryAPIClient:
         method: str,
         suffix: Optional[str] = None,
         data: Optional[Dict[str, Any]] = None,
+        json_format: bool = False,
     ) -> Tuple[int, Any]:
         url = self.url.format(self.base_url, suffix)
         logging.debug("{} simple {} request to {}".format(self.__str__(), method, url))
         if method == "post":
             return self._get_json(requests.post(url, data=data, headers=self.headers))
         elif method == "put":
+            if json_format:
+                return self._get_json(requests.put(url, json=data, headers=self.headers))
             return self._get_json(requests.put(url, data=data, headers=self.headers))
         else:
             return self._get_json(requests.get(url, headers=self.headers))
@@ -149,6 +152,7 @@ class SentryProvider:
                 "put",
                 "projects/{}/{}/keys/{}/".format(self.org_slug, project_slug, key),
                 {"rateLimit": {"window": 60, "count": 300}},
+                json_format=True
             )
         except SentryProjectKeyIDNotFound as key_id_err:
             logging.warning(
