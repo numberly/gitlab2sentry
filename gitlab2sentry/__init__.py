@@ -3,6 +3,8 @@ import time
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
+from slugify import slugify
+
 from gitlab2sentry.exceptions import SentryProjectCreationFailed
 from gitlab2sentry.resources import (
     DSN_MR_TITLE,
@@ -239,17 +241,20 @@ class Gitlab2Sentry:
         return groups
 
     def _create_sentry_project(
-        self, full_path: str, sentry_group_name: str
+        self,
+        full_path: str,
+        sentry_group_name: str,
+        sentry_project_name: str,
+        sentry_project_slug: str
     ) -> Optional[Dict[str, Any]]:
-
-        sentry_project_name = "-".join(full_path.split("/")[1:])
         try:
             return self.sentry_provider.get_or_create_project(
                 sentry_group_name,
                 sentry_project_name,
+                sentry_project_slug,
             )
         except SentryProjectCreationFailed as creation_err:
-            logging.warning(
+            logging.error(
                 "{} Project {} - Failed to create sentry project: {}".format(
                     self.__str__(), full_path, str(creation_err)
                 )
@@ -263,7 +268,10 @@ class Gitlab2Sentry:
         return None
 
     def _handle_g2s_project(
-        self, g2s_project: G2SProject, sentry_group_name: str
+        self,
+        g2s_project: G2SProject,
+        sentry_group_name: str,
+        custom_name: Optional[str] = None
     ) -> bool:
         """
         Creates sentry project for all given gitlab projects. It
@@ -300,9 +308,18 @@ class Gitlab2Sentry:
             ):
                 return False
             else:
+
+                sentry_project_name = (
+                    custom_name
+                    if custom_name
+                    else "-".join(g2s_project.full_path.split("/")[1:])
+                )
+                sentry_project_slug = slugify(sentry_project_name).lower()
                 sentry_project = self._create_sentry_project(
                     g2s_project.full_path,
                     sentry_group_name,
+                    sentry_project_name,
+                    sentry_project_slug
                 )
 
                 # If Sentry fails to create project skip
@@ -317,7 +334,9 @@ class Gitlab2Sentry:
                 if not dsn:
                     return False
 
-                mr_created = self.gitlab_provider.create_dsn_mr(g2s_project, dsn)
+                mr_created = self.gitlab_provider.create_dsn_mr(
+                    g2s_project, dsn, sentry_project_slug
+                )
                 if mr_created:
                     self.run_stats["mr_dsn_created"] += 1
                 return True
@@ -343,10 +362,18 @@ class Gitlab2Sentry:
             self.run_stats["not_in_g2s_cases"] += 1
         return False
 
-    def update(self, **kwargs) -> None:
+    def update(
+        self,
+        full_path: Optional[str] = None,
+        custom_name: Optional[str] = None
+    ) -> None:
         """
-        kwargs: full_path
+        args: full_path
         description: Full path of project (e.g. my-team/my-project)
+
+        args: custom_name
+        description: Specifies a custom name for the project. It only
+        works if the full_path is specified
 
         If the fullPath of a specific project is given it will run
         the script only for this project.
@@ -355,12 +382,13 @@ class Gitlab2Sentry:
         creation_days_limit is provided it will fetch all projects
         created after this period. If no it will fetch every project
         """
-        full_path = kwargs.get("full_path", None)
         if full_path:
             g2s_project = self._get_gitlab_project(full_path)
             if g2s_project:
                 sentry_group_name = g2s_project.group.split("/")[0].strip()
-                self._handle_g2s_project(g2s_project, sentry_group_name)  # type: ignore
+                self._handle_g2s_project(
+                    g2s_project, sentry_group_name, custom_name
+                )  # type: ignore
             else:
                 logging.info(
                     "{}: Project with fullPath - {} not found".format(
@@ -378,8 +406,8 @@ class Gitlab2Sentry:
                     # Skip if sentry is installed or
                     # Project has disabled MRs
                     self._handle_g2s_project(
-                        g2s_project, sentry_group_name  # type: ignore
-                    )
+                        g2s_project, sentry_group_name
+                    )  # type: ignore
 
         for key in self.run_stats.keys():
             logging.info(

@@ -4,7 +4,6 @@ from typing import Any, Dict, Optional, Tuple
 
 import requests
 from requests import Response
-from slugify import slugify
 
 from gitlab2sentry.exceptions import (
     SentryProjectCreationFailed,
@@ -93,10 +92,9 @@ class SentryProvider:
         return result
 
     def get_or_create_project(
-        self, group_name: str, project_name: str
+        self, group_name: str, project_name: str, project_slug: str
     ) -> Optional[Dict[str, Any]]:
 
-        project_slug = slugify(project_name).lower()
         status_code, result = self._client.simple_request(
             "get", "projects/{}/{}/".format(self.org_slug, project_slug)
         )
