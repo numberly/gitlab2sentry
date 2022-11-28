@@ -296,7 +296,9 @@ class GitlabProvider:
             SENTRYCLIRC_MR_TITLE.format(project_name=g2s_project.name),
         )
 
-    def create_dsn_mr(self, g2s_project: G2SProject, dsn: str) -> bool:
+    def create_dsn_mr(
+        self, g2s_project: G2SProject, dsn: str, project_slug: str
+    ) -> bool:
         logging.info(
             "{}: [Creating] Project {} - Sentry dsn: {}. Needs dsn MR.".format(
                 self.__str__(), g2s_project.full_path, dsn
@@ -306,6 +308,8 @@ class GitlabProvider:
             g2s_project,
             DSN_BRANCH_NAME,
             SENTRYCLIRC_FILEPATH,
-            DSN_MR_CONTENT.format(sentry_url=SENTRY_URL, dsn=dsn),
+            DSN_MR_CONTENT.format(
+                sentry_url=SENTRY_URL, dsn=dsn, project_slug=project_slug
+            ),
             DSN_MR_TITLE.format(project_name=g2s_project.name),
         )

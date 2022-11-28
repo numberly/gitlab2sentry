@@ -3,63 +3,164 @@ import os
 from collections import namedtuple
 from typing import List, Tuple
 
-import yaml
+from tests.resources import (
+    TEST_DSN_BRANCH_NAME,
+    TEST_DSN_MR_CONTENT,
+    TEST_DSN_MR_DESCRIPTION,
+    TEST_DSN_MR_TITLE,
+    TEST_GITLAB_AUTHOR_EMAIL,
+    TEST_GITLAB_AUTHOR_NAME,
+    TEST_GITLAB_GRAPHQL_PAGE_LENGTH,
+    TEST_GITLAB_GRAPHQL_SUFFIX,
+    TEST_GITLAB_GRAPHQL_TIMEOUT,
+    TEST_GITLAB_MR_KEYWORD,
+    TEST_GITLAB_RMV_SRC_BRANCH,
+    TEST_GITLAB_TOKEN,
+    TEST_GITLAB_URL,
+    TEST_SENTRY_DSN,
+    TEST_SENTRY_ORG_SLUG,
+    TEST_SENTRY_TOKEN,
+    TEST_SENTRY_URL,
+    TEST_SENTRYCLIRC_BRANCH_NAME,
+    TEST_SENTRYCLIRC_COM_MSG,
+    TEST_SENTRYCLIRC_FILEPATH,
+    TEST_SENTRYCLIRC_MR_CONTENT,
+    TEST_SENTRYCLIRC_MR_DESCRIPTION,
+    TEST_SENTRYCLIRC_MR_TITLE,
+)
 
-from gitlab2sentry.exceptions import InvalidYamlConfigError
 
-with open("g2s.yaml", "r") as config_file:
-    try:
-        config = yaml.safe_load(config_file)
-    except yaml.YAMLError as exc:
-        raise InvalidYamlConfigError(f"Invalid Config File: {str(exc)}")
+def is_test_env(env: str) -> bool:
+    return env == "test"
 
 try:
     ENV = os.getenv("ENV", "production")
-    TEST_SENTRY_URL = "http://sentry.test.com"
-    TEST_SENTRY_DSN = "http://test.sentry.test.com"
-    TEST_SENTRY_TOKEN = "test-token"
-    TEST_GITLAB_URL = "http://test-gitlab-url"
-    TEST_GITLAB_TOKEN = "test-token"
 
     # Sentry configuration
-    SENTRY_URL = os.getenv("SENTRY_URL") if ENV != "test" else TEST_SENTRY_URL
-    SENTRY_TOKEN = os.getenv("SENTRY_TOKEN") if ENV != "test" else TEST_SENTRY_TOKEN
-    SENTRY_DSN = os.getenv("SENTRY_DSN") if ENV != "test" else TEST_SENTRY_DSN
+    SENTRY_URL = (
+        TEST_SENTRY_URL
+        if is_test_env(ENV)
+        else os.environ["SENTRY_URL"]
+    )
+    SENTRY_TOKEN = (
+        TEST_SENTRY_TOKEN
+        if is_test_env(ENV)
+        else os.environ["SENTRY_TOKEN"]
+    )
+    SENTRY_DSN = (
+        TEST_SENTRY_DSN
+        if is_test_env(ENV)
+        else os.environ["SENTRY_DSN"]
+    )
     SENTRY_ENV = os.getenv("SENTRY_ENV", "production")
-    SENTRY_ORG_SLUG = config["sentry"]["slug"]
-
+    SENTRY_ORG_SLUG = (
+        TEST_SENTRY_ORG_SLUG
+        if is_test_env(ENV)
+        else os.environ["SENTRY_ORG_SLUG"]
+    )
     # DSN MR configuration.
-    DSN_MR_CONTENT = config["gitlab"]["dsn_mr"]["content"]
-    DSN_BRANCH_NAME = config["gitlab"]["dsn_mr"]["branch_name"]
-    DSN_MR_TITLE = config["gitlab"]["dsn_mr"]["title"]
-    DSN_MR_DESCRIPTION = config["gitlab"]["dsn_mr"]["description"]
+    DSN_MR_CONTENT = (
+        TEST_DSN_MR_CONTENT
+        if is_test_env(ENV)
+        else os.environ["GITLAB_DSN_MR_CONTENT"]
+    )
+    DSN_BRANCH_NAME = (
+        TEST_DSN_BRANCH_NAME
+        if is_test_env(ENV)
+        else os.environ["GITLAB_DSN_MR_BRANCH_NAME"]
+    )
+    DSN_MR_TITLE = (
+        TEST_DSN_MR_TITLE
+        if is_test_env(ENV)
+        else os.environ["GITLAB_DSN_MR_TITLE"]
+    )
+    DSN_MR_DESCRIPTION = (
+        TEST_DSN_MR_DESCRIPTION
+        if is_test_env(ENV)
+        else os.environ["GITLAB_DSN_MR_DESCRIPTION"]
+    )
 
     # Sentryclirc MR configuration.
-    SENTRYCLIRC_MR_CONTENT = config["gitlab"]["sentryclirc_mr"]["content"]
-    SENTRYCLIRC_BRANCH_NAME = config["gitlab"]["sentryclirc_mr"]["branch_name"]
-    SENTRYCLIRC_MR_TITLE = config["gitlab"]["sentryclirc_mr"]["title"]
-    SENTRYCLIRC_FILEPATH = config["gitlab"]["sentryclirc_mr"]["filepath"]
-    SENTRYCLIRC_COM_MSG = config["gitlab"]["sentryclirc_mr"]["commit_message"]
-    SENTRYCLIRC_MR_DESCRIPTION = config["gitlab"]["sentryclirc_mr"]["description"]
-
+    SENTRYCLIRC_MR_CONTENT = (
+        TEST_SENTRYCLIRC_MR_CONTENT
+        if is_test_env(ENV)
+        else os.environ["GITLAB_SENTRYCLIRC_MR_CONTENT"]
+    )
+    SENTRYCLIRC_BRANCH_NAME = (
+        TEST_SENTRYCLIRC_BRANCH_NAME
+        if is_test_env(ENV)
+        else os.environ["GITLAB_SENTRYCLIRC_MR_BRANCH_NAME"]
+    )
+    SENTRYCLIRC_MR_TITLE = (
+        TEST_SENTRYCLIRC_MR_TITLE
+        if is_test_env(ENV)
+        else os.environ["GITLAB_SENTRYCLIRC_MR_TITLE"]
+    )
+    SENTRYCLIRC_FILEPATH = (
+        TEST_SENTRYCLIRC_FILEPATH
+        if is_test_env(ENV)
+        else os.environ["GITLAB_SENTRYCLIRC_MR_FILEPATH"]
+    )
+    SENTRYCLIRC_COM_MSG = (
+        TEST_SENTRYCLIRC_COM_MSG
+        if is_test_env(ENV)
+        else os.environ["GITLAB_SENTRYCLIRC_MR_COMMIT_MSG"]
+    )
+    SENTRYCLIRC_MR_DESCRIPTION = (
+        TEST_SENTRYCLIRC_MR_DESCRIPTION
+        if is_test_env(ENV)
+        else os.environ["GITLAB_SENTRYCLIRC_MR_DESCRIPTION"]
+    )
     # Gitlab Configuration.
-    GITLAB_URL = os.getenv("GITLAB_URL") if ENV != "test" else TEST_GITLAB_URL
-    GITLAB_TOKEN = os.getenv("GITLAB_TOKEN") if ENV != "test" else TEST_GITLAB_TOKEN
-    GITLAB_GRAPHQL_SUFFIX = config["gitlab"]["config"]["graphql_suffix"]
-    GITLAB_GRAPHQL_TIMEOUT = int(config["gitlab"]["config"]["graphql_aiohttp_timeout"])
-    GITLAB_GRAPHQL_PAGE_LENGTH = int(config["gitlab"]["config"]["graphql_page_length"])
-    GITLAB_GROUP_IDENTIFIER = config["gitlab"]["config"].get("group_identifier", "")
-    GITLAB_AUTHOR_EMAIL = config["gitlab"]["config"]["author"]["email"]
-    GITLAB_AUTHOR_NAME = config["gitlab"]["config"]["author"]["name"]
-    GITLAB_PROJECT_CREATION_LIMIT = int(
-        config["gitlab"]["config"].get("creation_days_limit", 0)
+    GITLAB_URL = (
+        TEST_GITLAB_URL
+        if is_test_env(ENV)
+        else os.environ["GITLAB_URL"]
+    ) 
+    GITLAB_TOKEN = (
+        TEST_GITLAB_TOKEN
+        if is_test_env(ENV)
+        else os.environ["GITLAB_TOKEN"]
+    ) 
+    GITLAB_GRAPHQL_SUFFIX = (
+        TEST_GITLAB_GRAPHQL_SUFFIX
+        if is_test_env(ENV)
+        else os.environ["GITLAB_GRAPHQL_SUFFIX"]
     )
-    GITLAB_RMV_SRC_BRANCH = config["gitlab"]["config"]["remove_source"]
-    GITLAB_MENTIONS_LIST = config["gitlab"]["config"].get("mentions")
-    GITLAB_MENTIONS_ACCESS_LEVEL = int(
-        config["gitlab"]["config"].get("mentions_access_level")
+    GITLAB_GRAPHQL_TIMEOUT = (
+        TEST_GITLAB_GRAPHQL_TIMEOUT
+        if is_test_env(ENV)
+        else int(os.environ["GITLAB_AIOHTTP_TIMEOUT"])
     )
-    GITLAB_MR_KEYWORD = config["gitlab"]["config"]["keyword"]
+    GITLAB_GRAPHQL_PAGE_LENGTH = (
+        TEST_GITLAB_GRAPHQL_PAGE_LENGTH
+        if is_test_env(ENV)
+        else int(os.environ["GITLAB_GRAPHQL_PAGE_LENGTH"])
+    )
+    GITLAB_GROUP_IDENTIFIER = os.getenv("GITLAB_GROUP_IDENTIFIER", "")
+    GITLAB_AUTHOR_EMAIL = (
+        TEST_GITLAB_AUTHOR_EMAIL
+        if is_test_env(ENV)
+        else os.environ["GITLAB_AUTHOR_EMAIL"]
+    )
+    GITLAB_AUTHOR_NAME = (
+        TEST_GITLAB_AUTHOR_NAME
+        if is_test_env(ENV)
+        else os.environ["GITLAB_AUTHOR_NAME"]
+    )
+    GITLAB_PROJECT_CREATION_LIMIT = int(os.getenv("GITLAB_CREATION_DAYS_LIMIT", 30))
+    GITLAB_RMV_SRC_BRANCH = (
+        TEST_GITLAB_RMV_SRC_BRANCH
+        if is_test_env(ENV)
+        else os.environ["GITLAB_REMOVE_SOURCE"]
+    )
+    GITLAB_MENTIONS_LIST = os.getenv("GITLAB_MENTIONS")
+    GITLAB_MENTIONS_ACCESS_LEVEL = int(os.getenv("GITLAB_MENTIONS_ACCESS_LEVEL", 40))
+    GITLAB_MR_KEYWORD = (
+        TEST_GITLAB_MR_KEYWORD
+        if is_test_env(ENV)
+        else os.environ["GITLAB_MR_KEYWORD"]
+    )
 except TypeError as type_error:
     logging.error(
         "<Gitlab2Sentry>: g2s.yaml not configured properly - {}".format(str(type_error))

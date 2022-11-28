@@ -11,6 +11,5 @@ RUN groupadd --gid 1000 appuser \
 USER appuser
 COPY gitlab2sentry/ gitlab2sentry/
 COPY run.py run.py
-COPY g2s.yaml g2s.yaml
 
 CMD ["python3", "run.py"]
