@@ -84,7 +84,9 @@ def create_graphql_json_object(**kwargs):
             blob_item = {
                 "name": SENTRYCLIRC_FILEPATH,
                 "rawTextBlob": DSN_MR_CONTENT.format(
-                    sentry_url=TEST_SENTRY_URL, dsn=TEST_SENTRY_DSN
+                    sentry_url=TEST_SENTRY_URL,
+                    dsn=TEST_SENTRY_DSN,
+                    project_slug=TEST_PROJECT_NAME
                 ),
             }
         else:

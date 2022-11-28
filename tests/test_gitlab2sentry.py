@@ -215,7 +215,10 @@ def test_create_sentry_project(g2s_fixture, payload_new_project, mocker):
     )
     assert (
         g2s_fixture._create_sentry_project(
-            payload_new_project["node"]["fullPath"], TEST_GROUP_NAME
+            payload_new_project["node"]["fullPath"],
+            TEST_GROUP_NAME,
+            payload_new_project["node"]["name"],
+            payload_new_project["node"]["name"]
         )["name"]
         == TEST_GROUP_NAME
     )
@@ -226,7 +229,10 @@ def test_create_sentry_project(g2s_fixture, payload_new_project, mocker):
         side_effect=SentryProjectCreationFailed("error"),
     )
     assert not g2s_fixture._create_sentry_project(
-        payload_new_project["node"]["fullPath"], TEST_GROUP_NAME
+        payload_new_project["node"]["fullPath"],
+        TEST_GROUP_NAME,
+        payload_new_project["node"]["name"],
+        payload_new_project["node"]["name"]
     )
 
     mocker.patch.object(
@@ -235,7 +241,10 @@ def test_create_sentry_project(g2s_fixture, payload_new_project, mocker):
         side_effect=Exception("error"),
     )
     assert not g2s_fixture._create_sentry_project(
-        payload_new_project["node"]["fullPath"], TEST_GROUP_NAME
+        payload_new_project["node"]["fullPath"],
+        TEST_GROUP_NAME,
+        payload_new_project["node"]["name"],
+        payload_new_project["node"]["name"]
     )
 
 

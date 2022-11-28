@@ -4,6 +4,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import requests
 from requests import Response
+from slugify import slugify
 
 from gitlab2sentry.exceptions import (
     SentryProjectCreationFailed,

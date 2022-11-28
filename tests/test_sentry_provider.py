@@ -58,18 +58,18 @@ def test_get_or_create_project(sentry_provider_fixture, mocker):
     mocker.patch("requests.post", return_value=mocked_response(404))
     mocker.patch("requests.get", return_value=mocked_response(201))
     assert sentry_provider_fixture.get_or_create_project(
-        TEST_GROUP_NAME, TEST_PROJECT_NAME
+        TEST_GROUP_NAME, TEST_PROJECT_NAME, TEST_PROJECT_NAME
     ) == json.loads(DETAIL.decode())
 
     mocker.patch("requests.get", return_value=mocked_response(200))
     assert sentry_provider_fixture.get_or_create_project(
-        TEST_GROUP_NAME, TEST_PROJECT_NAME
+        TEST_GROUP_NAME, TEST_PROJECT_NAME, TEST_PROJECT_NAME
     ) == json.loads(DETAIL.decode())
 
     mocker.patch("requests.get", return_value=mocked_response(400))
     with pytest.raises(SentryProjectCreationFailed):
         assert sentry_provider_fixture.get_or_create_project(
-            TEST_GROUP_NAME, TEST_PROJECT_NAME
+            TEST_GROUP_NAME, TEST_PROJECT_NAME, TEST_PROJECT_NAME
         )
 
 
