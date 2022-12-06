@@ -152,7 +152,7 @@ try:
     GITLAB_RMV_SRC_BRANCH = (
         TEST_GITLAB_RMV_SRC_BRANCH
         if is_test_env(ENV)
-        else os.environ["GITLAB_REMOVE_SOURCE"]
+        else bool(int(os.environ["GITLAB_REMOVE_SOURCE"]))
     )
     GITLAB_MENTIONS_LIST = os.getenv("GITLAB_MENTIONS")
     GITLAB_MENTIONS_ACCESS_LEVEL = int(os.getenv("GITLAB_MENTIONS_ACCESS_LEVEL", 40))
