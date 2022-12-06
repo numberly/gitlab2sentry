@@ -161,14 +161,14 @@ try:
         if is_test_env(ENV)
         else os.environ["GITLAB_MR_KEYWORD"]
     )
-except TypeError as type_error:
+except KeyError as key_error:
     logging.error(
-        "<Gitlab2Sentry>: g2s.yaml not configured properly - {}".format(str(type_error))
+        "<Gitlab2Sentry>: env vars are not configured properly - {}".format(str(key_error))
     )
     exit(1)
 except ValueError as value_error:
     logging.error(
-        "<Gitlab2Sentry>: g2s.yaml not wrong value type - {}".format(str(value_error))
+        "<Gitlab2Sentry>: env vars have wrong value type - {}".format(str(value_error))
     )
     exit(1)
 
