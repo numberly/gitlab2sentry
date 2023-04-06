@@ -48,6 +48,34 @@ def sentry_provider_fixture():
     yield SentryProvider()
 
 
+class TestGitlabMember:
+    def __init__(self, username, access_level, state):
+        self.username = username
+        self.access_level = access_level
+        self.state = state
+
+
+TEST_GITLAB_PROJECT_MEMBERS = [
+    TestGitlabMember("active_user", 40, "active"),
+    TestGitlabMember("blocked_user", 40, "blocked")
+]
+
+
+class TestGitlabProject:
+    def __init__(self):
+        self.members = TestGitlabMemberManager()
+
+
+class TestGitlabMemberManager:
+    def all(self):
+        return TEST_GITLAB_PROJECT_MEMBERS
+
+
+@pytest.fixture
+def gitlab_project_fixture():
+    yield TestGitlabProject()
+
+
 def create_test_g2s_project(**kwargs):
     return G2SProject(
         1,

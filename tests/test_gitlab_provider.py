@@ -86,6 +86,18 @@ def test_from_iso_to_datetime(gitlab_provider_fixture):
     )
 
 
+def test_get_default_mentions(gitlab_provider_fixture, gitlab_project_fixture):
+    _mentioned_members = (
+        gitlab_provider_fixture._get_default_mentions(gitlab_project_fixture).split(", ")
+    )
+    _project_non_blocked_members = [
+        member
+        for member in gitlab_project_fixture.members.all()
+        if member.state != "blocked"
+    ]
+    assert len(_mentioned_members) == len(_project_non_blocked_members)
+
+
 def test_get_project(gitlab_provider_fixture, mocker):
     mocker.patch.object(
         gitlab_provider_fixture._gql_client,
