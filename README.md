@@ -119,6 +119,8 @@ make upgrade
     value: 60
   - name: GITLAB_GRAPHQL_PAGE_LENGTH
     value: 100
+  - name: GITLAB_MR_LABEL_LIST
+    value: "sentry,your-label" # comma separated list of labels for the mr
 ```
 
 2. If you want to follow the ```helm``` deployment process you will have to fill your details into the ```helm/values-production.yaml``` and ```helm/Chart.yaml```.
