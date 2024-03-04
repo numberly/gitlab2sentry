@@ -221,7 +221,10 @@ class GitlabProvider:
             [
                 f"@{member.username}"
                 for member in project.members.all()
-                if member.access_level >= GITLAB_MENTIONS_ACCESS_LEVEL
+                if (
+                    member.access_level >= GITLAB_MENTIONS_ACCESS_LEVEL
+                    and member.state != "blocked"
+                )
             ]
         )
 
