@@ -23,6 +23,7 @@ from gitlab2sentry.resources import (
     GITLAB_GRAPHQL_TIMEOUT,
     GITLAB_MENTIONS_ACCESS_LEVEL,
     GITLAB_MENTIONS_LIST,
+    GITLAB_MR_LABEL_LIST,
     GITLAB_PROJECT_CREATION_LIMIT,
     GITLAB_RMV_SRC_BRANCH,
     GITLAB_TOKEN,
@@ -271,6 +272,7 @@ class GitlabProvider:
                     "source_branch": branch_name,
                     "target_branch": project.default_branch,
                     "title": title,
+                    "labels": GITLAB_MR_LABEL_LIST,
                 }
             )
             return True

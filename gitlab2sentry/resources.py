@@ -14,6 +14,7 @@ from tests.resources import (
     TEST_GITLAB_GRAPHQL_SUFFIX,
     TEST_GITLAB_GRAPHQL_TIMEOUT,
     TEST_GITLAB_MR_KEYWORD,
+    TEST_GITLAB_MR_LABEL_LIST,
     TEST_GITLAB_RMV_SRC_BRANCH,
     TEST_GITLAB_TOKEN,
     TEST_GITLAB_URL,
@@ -161,6 +162,12 @@ try:
         if is_test_env(ENV)
         else os.environ["GITLAB_MR_KEYWORD"]
     )
+    GITLAB_MR_LABEL_LIST = (
+        TEST_GITLAB_MR_LABEL_LIST
+        if is_test_env(ENV)
+        else os.environ.get("GITLAB_MR_LABEL_LIST", "").split(",")
+    )
+
 except KeyError as key_error:
     logging.error(
         "<Gitlab2Sentry>: env vars are not configured properly - {}".format(str(key_error))

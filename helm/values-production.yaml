@@ -102,3 +102,5 @@ cronjob:
           value: 60
         - name: GITLAB_GRAPHQL_PAGE_LENGTH
           value: 100
+        - name: GITLAB_MR_LABEL_LIST
+          value: "sentry,gitlab2sentry" # comma separated list
