@@ -8,8 +8,6 @@ from tests.resources import (
     TEST_DSN_MR_CONTENT,
     TEST_DSN_MR_DESCRIPTION,
     TEST_DSN_MR_TITLE,
-    TEST_GITLAB_AUTHOR_EMAIL,
-    TEST_GITLAB_AUTHOR_NAME,
     TEST_GITLAB_GRAPHQL_PAGE_LENGTH,
     TEST_GITLAB_GRAPHQL_SUFFIX,
     TEST_GITLAB_GRAPHQL_TIMEOUT,
@@ -138,16 +136,6 @@ try:
         else int(os.environ["GITLAB_GRAPHQL_PAGE_LENGTH"])
     )
     GITLAB_GROUP_IDENTIFIER = os.getenv("GITLAB_GROUP_IDENTIFIER", "")
-    GITLAB_AUTHOR_EMAIL = (
-        TEST_GITLAB_AUTHOR_EMAIL
-        if is_test_env(ENV)
-        else os.environ["GITLAB_AUTHOR_EMAIL"]
-    )
-    GITLAB_AUTHOR_NAME = (
-        TEST_GITLAB_AUTHOR_NAME
-        if is_test_env(ENV)
-        else os.environ["GITLAB_AUTHOR_NAME"]
-    )
     GITLAB_PROJECT_CREATION_LIMIT = int(os.getenv("GITLAB_CREATION_DAYS_LIMIT", 30))
     GITLAB_RMV_SRC_BRANCH = (
         TEST_GITLAB_RMV_SRC_BRANCH

@@ -96,10 +96,6 @@ make upgrade
   - name: GITLAB_SENTRYCLIRC_MR_TITLE
     value: "your sentryclirc mr title"
     # Gitlab configuration values
-  - name: GITLAB_AUTHOR_NAME
-    value: author-name
-  - name: GITLAB_AUTHOR_EMAIL
-    value: your-author-email
   - name: GITLAB_GRAPHQL_SUFFIX
     value: api/graphql
   # - name: GITLAB_MENTIONS

@@ -16,8 +16,6 @@ from gitlab2sentry.resources import (
     DSN_MR_CONTENT,
     DSN_MR_TITLE,
     ENV,
-    GITLAB_AUTHOR_EMAIL,
-    GITLAB_AUTHOR_NAME,
     GITLAB_GRAPHQL_PAGE_LENGTH,
     GITLAB_GRAPHQL_SUFFIX,
     GITLAB_GRAPHQL_TIMEOUT,
@@ -207,8 +205,6 @@ class GitlabProvider:
             )
             f = project.files.create(
                 {
-                    "author_email": GITLAB_AUTHOR_EMAIL,
-                    "author_name": GITLAB_AUTHOR_NAME,
                     "branch": branch_name,
                     "commit_message": SENTRYCLIRC_COM_MSG,
                     "content": content,
