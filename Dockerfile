@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 WORKDIR /usr/src/app
 
@@ -10,6 +10,7 @@ RUN groupadd --gid 1000 appuser \
 
 USER appuser
 COPY gitlab2sentry/ gitlab2sentry/
+COPY tests/ tests/
 COPY run.py run.py
 
 CMD ["python3", "run.py"]
