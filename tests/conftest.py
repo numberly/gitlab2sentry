@@ -67,7 +67,7 @@ class TestGitlabProject:
 
 
 class TestGitlabMemberManager:
-    def all(self):
+    def list(self, all=True, iterator=True):
         return TEST_GITLAB_PROJECT_MEMBERS
 
 
