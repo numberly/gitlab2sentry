@@ -63,11 +63,11 @@ TEST_GITLAB_PROJECT_MEMBERS = [
 
 class TestGitlabProject:
     def __init__(self):
-        self.members = TestGitlabMemberManager()
+        self.members_all = TestGitlabMemberManager()
 
 
 class TestGitlabMemberManager:
-    def list(self):
+    def list(self, *args, **kwargs):
         return TEST_GITLAB_PROJECT_MEMBERS
 
 
