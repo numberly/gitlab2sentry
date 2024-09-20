@@ -221,7 +221,7 @@ class GitlabProvider:
         return ", ".join(
             [
                 f"@{member.username}"
-                for member in project.members_all.list(get_all=True)
+                for member in project.members_all.list(iterator=True)
                 if (
                     member.access_level >= GITLAB_MENTIONS_ACCESS_LEVEL
                     and member.state != "blocked"
