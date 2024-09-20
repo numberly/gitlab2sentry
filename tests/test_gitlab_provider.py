@@ -92,7 +92,7 @@ def test_get_default_mentions(gitlab_provider_fixture, gitlab_project_fixture):
     )
     _project_non_blocked_members = [
         member
-        for member in gitlab_project_fixture.members.list()
+        for member in gitlab_project_fixture.members_all.list()
         if member.state != "blocked"
     ]
     assert len(_mentioned_members) == len(_project_non_blocked_members)
