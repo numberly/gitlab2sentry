@@ -10,14 +10,14 @@ from gitlab2sentry.exceptions import (
     SentryProjectCreationFailed,
     SentryProjectKeyIDNotFound,
 )
-from gitlab2sentry.resources import SENTRY_ORG_SLUG, SENTRY_TOKEN, SENTRY_URL
+from gitlab2sentry.resources import settings
 
 
 class SentryAPIClient:
     def __init__(
         self,
-        base_url: Optional[str] = SENTRY_URL,
-        token: Optional[str] = SENTRY_TOKEN,
+        base_url: Optional[str] = settings.sentry_url,
+        token: Optional[str] = settings.sentry_token,
     ):
         self.base_url = base_url
         self.url = "{}/api/0/{}"
@@ -50,7 +50,9 @@ class SentryAPIClient:
             return self._get_json(requests.post(url, data=data, headers=self.headers))
         elif method == "put":
             if json_format:
-                return self._get_json(requests.put(url, json=data, headers=self.headers))
+                return self._get_json(
+                    requests.put(url, json=data, headers=self.headers)
+                )
             return self._get_json(requests.put(url, data=data, headers=self.headers))
         else:
             return self._get_json(requests.get(url, headers=self.headers))
@@ -59,9 +61,9 @@ class SentryAPIClient:
 class SentryProvider:
     def __init__(
         self,
-        url: Optional[str] = SENTRY_URL,
-        token: Optional[str] = SENTRY_TOKEN,
-        org_slug: Optional[str] = SENTRY_ORG_SLUG,
+        url: Optional[str] = settings.sentry_url,
+        token: Optional[str] = settings.sentry_token,
+        org_slug: Optional[str] = settings.sentry_org_slug,
     ):
         self.url = url
         self.org_slug = org_slug
@@ -151,7 +153,7 @@ class SentryProvider:
                 "put",
                 "projects/{}/{}/keys/{}/".format(self.org_slug, project_slug, key),
                 {"rateLimit": {"window": 60, "count": 300}},
-                json_format=True
+                json_format=True,
             )
         except SentryProjectKeyIDNotFound as key_id_err:
             logging.warning(

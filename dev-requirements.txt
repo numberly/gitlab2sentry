@@ -10,3 +10,4 @@ pytest-mock
 types-python-slugify
 types-PyYAML
 types-requests
+pytest-env==1.1.5

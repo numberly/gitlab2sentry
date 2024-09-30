@@ -5,19 +5,16 @@ from gitlab import Gitlab
 from gql.transport.aiohttp import AIOHTTPTransport
 
 from gitlab2sentry.resources import (
-    GITLAB_PROJECT_CREATION_LIMIT,
     GRAPHQL_FETCH_PROJECT_QUERY,
     GRAPHQL_LIST_PROJECTS_QUERY,
-    GRAPHQL_TEST_QUERY,
-    TEST_GITLAB_TOKEN,
-    TEST_GITLAB_URL,
+    settings,
 )
-from tests.conftest import CURRENT_TIME
+from tests.conftest import CURRENT_TIME, GRAPHQL_TEST_QUERY
 
 
 def test_get_transport(gql_client_fixture):
     assert isinstance(
-        gql_client_fixture._get_transport(TEST_GITLAB_URL, TEST_GITLAB_TOKEN),
+        gql_client_fixture._get_transport(settings.gitlab_url, settings.gitlab_token),
         AIOHTTPTransport,
     )
 
@@ -67,15 +64,16 @@ def test_project_list_query(gql_client_fixture, payload_new_project, mocker):
 
 def test_get_gitlab(gitlab_provider_fixture):
     assert isinstance(
-        gitlab_provider_fixture._get_gitlab(TEST_GITLAB_URL, TEST_GITLAB_TOKEN), Gitlab
+        gitlab_provider_fixture._get_gitlab(settings.gitlab_url, settings.gitlab_token),
+        Gitlab,
     )
 
 
 def test_get_update_limit(gitlab_provider_fixture):
-    if GITLAB_PROJECT_CREATION_LIMIT:
+    if settings.gitlab_project_creation_limit:
         assert (
             datetime.now() - gitlab_provider_fixture._get_update_limit()
-        ).days - GITLAB_PROJECT_CREATION_LIMIT <= 1
+        ).days - settings.gitlab_project_creation_limit <= 1
     else:
         assert not gitlab_provider_fixture._get_update_limit()
 
@@ -87,9 +85,9 @@ def test_from_iso_to_datetime(gitlab_provider_fixture):
 
 
 def test_get_default_mentions(gitlab_provider_fixture, gitlab_project_fixture):
-    _mentioned_members = (
-        gitlab_provider_fixture._get_default_mentions(gitlab_project_fixture).split(", ")
-    )
+    _mentioned_members = gitlab_provider_fixture._get_default_mentions(
+        gitlab_project_fixture
+    ).split(", ")
     _project_non_blocked_members = [
         member
         for member in gitlab_project_fixture.members_all.list()

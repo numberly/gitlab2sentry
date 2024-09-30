@@ -7,7 +7,7 @@ from gitlab2sentry.exceptions import (
     SentryProjectCreationFailed,
     SentryProjectKeyIDNotFound,
 )
-from gitlab2sentry.resources import TEST_SENTRY_DSN
+from gitlab2sentry.resources import settings
 from tests.conftest import TEST_GROUP_NAME, TEST_PROJECT_NAME
 
 STATUS_CODE, DETAIL = 400, b'{"msg": "error_details"}'
@@ -113,7 +113,7 @@ def test_set_rate_limit_for_key(sentry_provider_fixture, mocker):
     mocker.patch.object(
         sentry_provider_fixture,
         attribute="_get_dsn_and_key_id",
-        return_value=(TEST_SENTRY_DSN, "result"),
+        return_value=(settings.sentry_dsn, "result"),
     )
     mocker.patch.object(
         sentry_provider_fixture._client,
@@ -122,7 +122,7 @@ def test_set_rate_limit_for_key(sentry_provider_fixture, mocker):
     )
     assert (
         sentry_provider_fixture.set_rate_limit_for_key(TEST_PROJECT_NAME)
-        == TEST_SENTRY_DSN
+        == settings.sentry_dsn
     )
 
     mocker.patch.object(
