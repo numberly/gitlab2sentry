@@ -1,5 +1,5 @@
 from gitlab2sentry.exceptions import SentryProjectCreationFailed
-from gitlab2sentry.resources import TEST_SENTRY_DSN
+from gitlab2sentry.resources import settings
 from gitlab2sentry.utils import GitlabProvider, SentryProvider
 from tests.conftest import TEST_GROUP_NAME
 
@@ -218,7 +218,7 @@ def test_create_sentry_project(g2s_fixture, payload_new_project, mocker):
             payload_new_project["node"]["fullPath"],
             TEST_GROUP_NAME,
             payload_new_project["node"]["name"],
-            payload_new_project["node"]["name"]
+            payload_new_project["node"]["name"],
         )["name"]
         == TEST_GROUP_NAME
     )
@@ -232,7 +232,7 @@ def test_create_sentry_project(g2s_fixture, payload_new_project, mocker):
         payload_new_project["node"]["fullPath"],
         TEST_GROUP_NAME,
         payload_new_project["node"]["name"],
-        payload_new_project["node"]["name"]
+        payload_new_project["node"]["name"],
     )
 
     mocker.patch.object(
@@ -244,7 +244,7 @@ def test_create_sentry_project(g2s_fixture, payload_new_project, mocker):
         payload_new_project["node"]["fullPath"],
         TEST_GROUP_NAME,
         payload_new_project["node"]["name"],
-        payload_new_project["node"]["name"]
+        payload_new_project["node"]["name"],
     )
 
 
@@ -285,7 +285,7 @@ def test_handle_g2s_project(
     mocker.patch.object(
         g2s_fixture.sentry_provider,
         attribute="set_rate_limit_for_key",
-        return_value=TEST_SENTRY_DSN,
+        return_value=settings.sentry_dsn,
     )
     mocker.patch.object(
         g2s_fixture,

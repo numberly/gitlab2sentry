@@ -7,20 +7,11 @@ from slugify import slugify
 
 from gitlab2sentry.exceptions import SentryProjectCreationFailed
 from gitlab2sentry.resources import (
-    DSN_MR_TITLE,
     G2S_STATS,
-    GITLAB_GRAPHQL_SUFFIX,
-    GITLAB_GROUP_IDENTIFIER,
-    GITLAB_TOKEN,
-    GITLAB_URL,
     GRAPHQL_FETCH_PROJECT_QUERY,
     GRAPHQL_LIST_PROJECTS_QUERY,
-    SENTRY_ORG_SLUG,
-    SENTRY_TOKEN,
-    SENTRY_URL,
-    SENTRYCLIRC_FILEPATH,
-    SENTRYCLIRC_MR_TITLE,
     G2SProject,
+    settings,
 )
 from gitlab2sentry.utils import GitlabProvider, SentryProvider
 
@@ -43,10 +34,12 @@ class Gitlab2Sentry:
         return "<Gitlab2Sentry>"
 
     def _get_gitlab_provider(self) -> GitlabProvider:
-        return GitlabProvider(GITLAB_URL, GITLAB_TOKEN)
+        return GitlabProvider(settings.gitlab_url, settings.gitlab_token)
 
     def _get_sentry_provider(self) -> SentryProvider:
-        return SentryProvider(SENTRY_URL, SENTRY_TOKEN, SENTRY_ORG_SLUG)
+        return SentryProvider(
+            settings.sentry_url, settings.sentry_token, settings.sentry_org_slug
+        )
 
     def _ensure_sentry_group(self, name: str) -> None:
         if name not in self.sentry_groups:
@@ -118,12 +111,14 @@ class Gitlab2Sentry:
         sentryclirc_mr_state, dsn_mr_state = None, None
         if mr_list:
             for mr in mr_list:
-                if mr["title"] == SENTRYCLIRC_MR_TITLE.format(
+                if mr["title"] == settings.sentryclirc_mr_title.format(
                     project_name=project_name
                 ):
                     if not (sentryclirc_mr_state and sentryclirc_mr_state == "opened"):
                         sentryclirc_mr_state = mr["state"]
-                elif mr["title"] == DSN_MR_TITLE.format(project_name=project_name):
+                elif mr["title"] == settings.dsn_mr_title.format(
+                    project_name=project_name
+                ):
                     if not (dsn_mr_state and dsn_mr_state == "opened"):
                         dsn_mr_state = mr["state"]
                 else:
@@ -138,7 +133,7 @@ class Gitlab2Sentry:
 
     def _get_sentryclirc_file(self, blob: List[Dict[str, Any]]) -> tuple:
         has_sentryclirc_file, has_dsn = False, False
-        if blob and blob[0]["name"] == SENTRYCLIRC_FILEPATH:
+        if blob and blob[0]["name"] == settings.sentryclirc_filepath:
             has_sentryclirc_file = True
             if blob[0].get("rawTextBlob"):
                 for line in blob[0]["rawTextBlob"].split("\n"):
@@ -191,7 +186,7 @@ class Gitlab2Sentry:
         query_start_time = time.time()
         logging.info(
             "{}: Starting querying all Gitlab group-projects with Graphql at {}/{}".format(  # noqa
-                self.__str__(), GITLAB_URL, GITLAB_GRAPHQL_SUFFIX
+                self.__str__(), settings.gitlab_url, settings.gitlab_graphql_suffix
             )
         )
         request_gen = self.gitlab_provider.get_all_projects(GRAPHQL_LIST_PROJECTS_QUERY)
@@ -209,7 +204,7 @@ class Gitlab2Sentry:
         GRAPHQL_FETCH_PROJECT_QUERY["full_path"] = full_path
         logging.info(
             "{}: Starting querying for specific Gitlab project with Graphql at {}/{}".format(  # noqa
-                self.__str__(), GITLAB_URL, GITLAB_GRAPHQL_SUFFIX
+                self.__str__(), settings.gitlab_url, settings.gitlab_graphql_suffix
             )
         )
         result = self.gitlab_provider.get_project(GRAPHQL_FETCH_PROJECT_QUERY)
@@ -227,7 +222,7 @@ class Gitlab2Sentry:
                 result = result_node["node"]
                 if self._is_group_project(result["group"]):
                     group_name = result["fullPath"].split("/")[0]
-                    if group_name.startswith(GITLAB_GROUP_IDENTIFIER):
+                    if group_name.startswith(settings.gitlab_group_identifier):
                         g2s_project = self._get_g2s_project(result)
 
                         if g2s_project:
@@ -245,7 +240,7 @@ class Gitlab2Sentry:
         full_path: str,
         sentry_group_name: str,
         sentry_project_name: str,
-        sentry_project_slug: str
+        sentry_project_slug: str,
     ) -> Optional[Dict[str, Any]]:
         try:
             return self.sentry_provider.get_or_create_project(
@@ -271,7 +266,7 @@ class Gitlab2Sentry:
         self,
         g2s_project: G2SProject,
         sentry_group_name: str,
-        custom_name: Optional[str] = None
+        custom_name: Optional[str] = None,
     ) -> bool:
         """
         Creates sentry project for all given gitlab projects. It
@@ -319,7 +314,7 @@ class Gitlab2Sentry:
                     g2s_project.full_path,
                     sentry_group_name,
                     sentry_project_name,
-                    sentry_project_slug
+                    sentry_project_slug,
                 )
 
                 # If Sentry fails to create project skip
@@ -363,9 +358,7 @@ class Gitlab2Sentry:
         return False
 
     def update(
-        self,
-        full_path: Optional[str] = None,
-        custom_name: Optional[str] = None
+        self, full_path: Optional[str] = None, custom_name: Optional[str] = None
     ) -> None:
         """
         args: full_path
@@ -387,7 +380,7 @@ class Gitlab2Sentry:
             if g2s_project:
                 sentry_group_name = g2s_project.group.split("/")[0].strip()
                 self._handle_g2s_project(
-                    g2s_project, sentry_group_name, custom_name # type: ignore
+                    g2s_project, sentry_group_name, custom_name  # type: ignore
                 )
             else:
                 logging.info(

@@ -1,6 +1,8 @@
 aiohttp==3.10.5
 awesome-slugify==1.6.5
 gql==3.5.0
+pydantic-settings==2.5.2
+pydantic==2.9.2
 python-gitlab==4.10.0
 pytz==2022.1
 requests==2.32.3

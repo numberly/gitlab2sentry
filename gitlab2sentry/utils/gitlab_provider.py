@@ -11,42 +11,19 @@ from gql import Client, gql
 from gql.transport.aiohttp import AIOHTTPTransport
 from gql.transport.aiohttp import log as websockets_logger
 
-from gitlab2sentry.resources import (
-    DSN_BRANCH_NAME,
-    DSN_MR_CONTENT,
-    DSN_MR_TITLE,
-    ENV,
-    GITLAB_AUTHOR_EMAIL,
-    GITLAB_AUTHOR_NAME,
-    GITLAB_GRAPHQL_PAGE_LENGTH,
-    GITLAB_GRAPHQL_SUFFIX,
-    GITLAB_GRAPHQL_TIMEOUT,
-    GITLAB_MENTIONS_ACCESS_LEVEL,
-    GITLAB_MENTIONS_LIST,
-    GITLAB_MR_LABEL_LIST,
-    GITLAB_PROJECT_CREATION_LIMIT,
-    GITLAB_RMV_SRC_BRANCH,
-    GITLAB_TOKEN,
-    GITLAB_URL,
-    SENTRY_URL,
-    SENTRYCLIRC_BRANCH_NAME,
-    SENTRYCLIRC_COM_MSG,
-    SENTRYCLIRC_FILEPATH,
-    SENTRYCLIRC_MR_CONTENT,
-    SENTRYCLIRC_MR_DESCRIPTION,
-    SENTRYCLIRC_MR_TITLE,
-    G2SProject,
-)
+from gitlab2sentry.resources import G2SProject, settings
 
 
 class GraphQLClient:
     def __init__(
-        self, url: Optional[str] = GITLAB_URL, token: Optional[str] = GITLAB_TOKEN
+        self,
+        url: Optional[str] = settings.gitlab_url,
+        token: Optional[str] = settings.gitlab_token,
     ):
         self._client = Client(
             transport=self._get_transport(url, token),
             fetch_schema_from_transport=True,
-            execute_timeout=GITLAB_GRAPHQL_TIMEOUT,
+            execute_timeout=settings.gitlab_graphql_timeout,
         )
         websockets_logger.setLevel(logging.WARNING)
 
@@ -57,7 +34,7 @@ class GraphQLClient:
         self, url: Optional[str], token: Optional[str]
     ) -> AIOHTTPTransport:
         return AIOHTTPTransport(
-            url="{}/{}".format(url, GITLAB_GRAPHQL_SUFFIX),
+            url="{}/{}".format(url, settings.gitlab_graphql_suffix),
             headers={
                 "PRIVATE-TOKEN": token,  # type: ignore
                 "Content-Type": "application/json",
@@ -80,9 +57,9 @@ class GraphQLClient:
 
     def project_fetch_query(self, query_dict: Dict[str, str]) -> Dict[str, Any]:
         project_full_path = f"{query_dict['full_path']}"
-        blobsPaths = '(paths: "{}")'.format(SENTRYCLIRC_FILEPATH)
+        blobsPaths = '(paths: "{}")'.format(settings.sentryclirc_filepath)
         titlesListMRs = '(sourceBranches: ["{}","{}"])'.format(
-            SENTRYCLIRC_BRANCH_NAME, DSN_BRANCH_NAME
+            settings.sentryclirc_branch_name, settings.dsn_branch_name
         )
         query = query_dict["body"] % (project_full_path, blobsPaths, titlesListMRs)
         return self._query(query_dict["name"], query)
@@ -92,13 +69,13 @@ class GraphQLClient:
     ) -> Dict[str, Any]:
         whereStatement = ' searchNamespaces: true sort: "createdAt_desc"'
         edgesStatement = "(first: {}{}{})".format(
-            GITLAB_GRAPHQL_PAGE_LENGTH,
+            settings.gitlab_graphql_page_length,
             f' after: "{endCursor}"' if endCursor else "",
             whereStatement,
         )
-        blobsPaths = '(paths: "{}")'.format(SENTRYCLIRC_FILEPATH)
+        blobsPaths = '(paths: "{}")'.format(settings.sentryclirc_filepath)
         titlesListMRs = '(sourceBranches: ["{}","{}"])'.format(
-            SENTRYCLIRC_BRANCH_NAME, DSN_BRANCH_NAME
+            settings.sentryclirc_branch_name, settings.dsn_branch_name
         )
         query = query_dict["body"] % (edgesStatement, blobsPaths, titlesListMRs)
         return self._query(query_dict["name"], query)
@@ -106,7 +83,9 @@ class GraphQLClient:
 
 class GitlabProvider:
     def __init__(
-        self, url: Optional[str] = GITLAB_URL, token: Optional[str] = GITLAB_TOKEN
+        self,
+        url: Optional[str] = settings.gitlab_url,
+        token: Optional[str] = settings.gitlab_token,
     ) -> None:
         self.gitlab = self._get_gitlab(url, token)
         self._gql_client = GraphQLClient(url, token)
@@ -117,13 +96,15 @@ class GitlabProvider:
 
     def _get_gitlab(self, url: Optional[str], token: Optional[str]) -> Gitlab:
         gitlab = Gitlab(url, private_token=token)
-        if ENV != "test":
+        if settings.env != "test":
             gitlab.auth()
         return gitlab
 
     def _get_update_limit(self) -> Optional[datetime]:
-        if GITLAB_PROJECT_CREATION_LIMIT:
-            return datetime.now() - timedelta(days=GITLAB_PROJECT_CREATION_LIMIT)
+        if settings.gitlab_project_creation_limit:
+            return datetime.now() - timedelta(
+                days=settings.gitlab_project_creation_limit
+            )
         else:
             return None
 
@@ -197,21 +178,21 @@ class GitlabProvider:
         try:
             f = project.files.get(file_path=file_path, ref=project.default_branch)
             f.content = content
-            f.save(branch=branch_name, commit_message=SENTRYCLIRC_COM_MSG)
+            f.save(branch=branch_name, commit_message=settings.sentryclirc_com_msg)
         except GitlabGetError:
             logging.info(
                 "{}: [Creating] Project {} - File not found for project {}.".format(
                     self.__str__(),
-                    SENTRYCLIRC_FILEPATH,
+                    settings.sentryclirc_filepath,
                     full_path,
                 )
             )
             f = project.files.create(
                 {
-                    "author_email": GITLAB_AUTHOR_EMAIL,
-                    "author_name": GITLAB_AUTHOR_NAME,
+                    "author_email": settings.gitlab_author_email,
+                    "author_name": settings.gitlab_author_name,
                     "branch": branch_name,
-                    "commit_message": SENTRYCLIRC_COM_MSG,
+                    "commit_message": settings.sentryclirc_com_msg,
                     "content": content,
                     "file_path": file_path,
                 }
@@ -223,7 +204,7 @@ class GitlabProvider:
                 f"@{member.username}"
                 for member in project.members_all.list(iterator=True)
                 if (
-                    member.access_level >= GITLAB_MENTIONS_ACCESS_LEVEL
+                    member.access_level >= settings.gitlab_mentions_access_level
                     and member.state != "blocked"
                 )
             ]
@@ -234,8 +215,8 @@ class GitlabProvider:
     ) -> str:
         mentions = (
             self._get_default_mentions(project)
-            if not GITLAB_MENTIONS_LIST
-            else ", ".join(GITLAB_MENTIONS_LIST)
+            if not settings.gitlab_mentions
+            else ", ".join(settings.gitlab_mentions)
         )
         return "\n".join(
             [
@@ -265,14 +246,14 @@ class GitlabProvider:
                 {
                     "description": self._get_mr_description(
                         project,
-                        SENTRYCLIRC_MR_DESCRIPTION,
+                        settings.sentryclirc_mr_description,
                         g2s_project.name_with_namespace,
                     ),
-                    "remove_source_branch": GITLAB_RMV_SRC_BRANCH,
+                    "remove_source_branch": settings.gitlab_rmv_src_branch,
                     "source_branch": branch_name,
                     "target_branch": project.default_branch,
                     "title": title,
-                    "labels": GITLAB_MR_LABEL_LIST,
+                    "labels": settings.gitlab_mr_label_list,
                 }
             )
             return True
@@ -295,10 +276,10 @@ class GitlabProvider:
         )
         return self._create_mr(
             g2s_project,
-            SENTRYCLIRC_BRANCH_NAME,
-            SENTRYCLIRC_FILEPATH,
-            SENTRYCLIRC_MR_CONTENT.format(sentry_url=SENTRY_URL),
-            SENTRYCLIRC_MR_TITLE.format(project_name=g2s_project.name),
+            settings.sentryclirc_branch_name,
+            settings.sentryclirc_filepath,
+            settings.sentryclirc_mr_content.format(sentry_url=settings.sentry_url),
+            settings.sentryclirc_mr_title.format(project_name=g2s_project.name),
         )
 
     def create_dsn_mr(
@@ -311,10 +292,10 @@ class GitlabProvider:
         )
         return self._create_mr(
             g2s_project,
-            DSN_BRANCH_NAME,
-            SENTRYCLIRC_FILEPATH,
-            DSN_MR_CONTENT.format(
-                sentry_url=SENTRY_URL, dsn=dsn, project_slug=project_slug
+            settings.dsn_branch_name,
+            settings.sentryclirc_filepath,
+            settings.dsn_mr_content.format(
+                sentry_url=settings.sentry_url, dsn=dsn, project_slug=project_slug
             ),
-            DSN_MR_TITLE.format(project_name=g2s_project.name),
+            settings.dsn_mr_title.format(project_name=g2s_project.name),
         )

@@ -4,26 +4,18 @@ import pytest
 import pytz
 
 from gitlab2sentry import Gitlab2Sentry
-from gitlab2sentry.resources import (
-    DSN_MR_CONTENT,
-    DSN_MR_TITLE,
-    GITLAB_GROUP_IDENTIFIER,
-    GITLAB_PROJECT_CREATION_LIMIT,
-    SENTRYCLIRC_FILEPATH,
-    SENTRYCLIRC_MR_CONTENT,
-    SENTRYCLIRC_MR_TITLE,
-    TEST_SENTRY_DSN,
-    TEST_SENTRY_URL,
-    G2SProject,
-)
+from gitlab2sentry.resources import G2SProject, settings
 from gitlab2sentry.utils.gitlab_provider import GitlabProvider, GraphQLClient
 from gitlab2sentry.utils.sentry_provider import SentryProvider
 
 TEST_PROJECT_NAME = "test"
-TEST_GROUP_NAME = f"{GITLAB_GROUP_IDENTIFIER}test"
+TEST_GROUP_NAME = f"{settings.gitlab_group_identifier}test"
 CURRENT_TIME = datetime.strftime(datetime.now(pytz.UTC), "%Y-%m-%dT%H:%M:%SZ")
 OLD_TIME = datetime.strftime(
-    (datetime.now(pytz.UTC) - timedelta(days=(GITLAB_PROJECT_CREATION_LIMIT + 1))),
+    (
+        datetime.now(pytz.UTC)
+        - timedelta(days=(settings.gitlab_project_creation_limit + 1))
+    ),
     "%Y-%m-%dT%H:%M:%SZ",
 )
 
@@ -57,7 +49,7 @@ class TestGitlabMember:
 
 TEST_GITLAB_PROJECT_MEMBERS = [
     TestGitlabMember("active_user", 40, "active"),
-    TestGitlabMember("blocked_user", 40, "blocked")
+    TestGitlabMember("blocked_user", 40, "blocked"),
 ]
 
 
@@ -110,18 +102,18 @@ def create_graphql_json_object(**kwargs):
     if kwargs["has_sentryclirc_file"]:
         if kwargs["has_dsn"]:
             blob_item = {
-                "name": SENTRYCLIRC_FILEPATH,
-                "rawTextBlob": DSN_MR_CONTENT.format(
-                    sentry_url=TEST_SENTRY_URL,
-                    dsn=TEST_SENTRY_DSN,
-                    project_slug=TEST_PROJECT_NAME
+                "name": settings.sentryclirc_filepath,
+                "rawTextBlob": settings.dsn_mr_content.format(
+                    sentry_url=settings.sentry_url,
+                    dsn=settings.sentry_dsn,
+                    project_slug=TEST_PROJECT_NAME,
                 ),
             }
         else:
             blob_item = {
-                "name": SENTRYCLIRC_FILEPATH,
-                "rawTextBlob": SENTRYCLIRC_MR_CONTENT.format(
-                    sentry_url=TEST_SENTRY_URL
+                "name": settings.sentryclirc_filepath,
+                "rawTextBlob": settings.sentryclirc_mr_content.format(
+                    sentry_url=settings.sentry_url
                 ),
             }
         response_dict["node"]["repository"]["blobs"]["nodes"].append(blob_item)
@@ -129,7 +121,7 @@ def create_graphql_json_object(**kwargs):
     if kwargs["sentryclirc_mr_state"]:
         sentryclirc_mr = {
             "id": "gid://gitlab/MergeRequest/0001",
-            "title": SENTRYCLIRC_MR_TITLE.format(
+            "title": settings.sentryclirc_mr_title.format(
                 project_name=response_dict["node"]["name"]
             ),
             "state": kwargs["sentryclirc_mr_state"],
@@ -139,7 +131,9 @@ def create_graphql_json_object(**kwargs):
     if kwargs["dsn_mr_state"]:
         dsn_mr = {
             "id": "gid://gitlab/MergeRequest/0001",
-            "title": DSN_MR_TITLE.format(project_name=response_dict["node"]["name"]),
+            "title": settings.dsn_mr_title.format(
+                project_name=response_dict["node"]["name"]
+            ),
             "state": kwargs["dsn_mr_state"],
         }
         response_dict["node"]["mergeRequests"]["nodes"].append(dsn_mr)
@@ -356,3 +350,38 @@ def payload_sentry_project():
         sentryclirc_mr_state="merged",
         dsn_mr_state="merged",
     )
+
+
+GRAPHQL_TEST_QUERY = {
+    "name": "TEST_QUERY",
+    "instance": "projects",
+    "body": """
+{
+    project(fullPath: "none") {
+        id
+        fullPath
+        name
+        createdAt
+        mergeRequestsEnabled
+        group {
+            name
+        }
+        repository {
+            blobs {
+                nodes {
+                    name
+                    rawTextBlob
+                }
+            }
+        }
+        mergeRequests {
+            nodes {
+                id
+                title
+                state
+            }
+        }
+    }
+}
+""",
+}
