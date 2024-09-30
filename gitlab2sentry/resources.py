@@ -1,11 +1,9 @@
-import os
 from collections import namedtuple
 from typing import List, Tuple
-
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
-ENV = os.getenv("ENV", "production")
+
 
 
 class Settings(BaseSettings):

@@ -64,8 +64,7 @@ def test_project_list_query(gql_client_fixture, payload_new_project, mocker):
 
 def test_get_gitlab(gitlab_provider_fixture):
     assert isinstance(
-        gitlab_provider_fixture._get_gitlab(settings.gitlab_url, settings.gitlab_token),
-        Gitlab,
+        gitlab_provider_fixture._get_gitlab(settings.gitlab_url, settings.gitlab_token), Gitlab
     )
 
 
