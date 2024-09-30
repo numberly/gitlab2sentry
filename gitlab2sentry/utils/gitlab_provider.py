@@ -16,9 +16,7 @@ from gitlab2sentry.resources import G2SProject, settings
 
 class GraphQLClient:
     def __init__(
-        self,
-        url: Optional[str] = settings.gitlab_url,
-        token: Optional[str] = settings.gitlab_token,
+        self, url: Optional[str] = settings.gitlab_url, token: Optional[str] = settings.gitlab_token
     ):
         self._client = Client(
             transport=self._get_transport(url, token),
@@ -83,9 +81,7 @@ class GraphQLClient:
 
 class GitlabProvider:
     def __init__(
-        self,
-        url: Optional[str] = settings.gitlab_url,
-        token: Optional[str] = settings.gitlab_token,
+        self, url: Optional[str] = settings.gitlab_url, token: Optional[str] = settings.gitlab_token
     ) -> None:
         self.gitlab = self._get_gitlab(url, token)
         self._gql_client = GraphQLClient(url, token)
@@ -102,9 +98,7 @@ class GitlabProvider:
 
     def _get_update_limit(self) -> Optional[datetime]:
         if settings.gitlab_project_creation_limit:
-            return datetime.now() - timedelta(
-                days=settings.gitlab_project_creation_limit
-            )
+            return datetime.now() - timedelta(days=settings.gitlab_project_creation_limit)
         else:
             return None
 

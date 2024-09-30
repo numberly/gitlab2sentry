@@ -5,6 +5,10 @@ import pytz
 
 from gitlab2sentry import Gitlab2Sentry
 from gitlab2sentry.resources import G2SProject, settings
+from gitlab2sentry.resources import (
+    settings,
+    G2SProject,
+)
 from gitlab2sentry.utils.gitlab_provider import GitlabProvider, GraphQLClient
 from gitlab2sentry.utils.sentry_provider import SentryProvider
 
@@ -18,7 +22,6 @@ OLD_TIME = datetime.strftime(
     ),
     "%Y-%m-%dT%H:%M:%SZ",
 )
-
 
 @pytest.fixture
 def g2s_fixture():
@@ -106,7 +109,11 @@ def create_graphql_json_object(**kwargs):
                 "rawTextBlob": settings.dsn_mr_content.format(
                     sentry_url=settings.sentry_url,
                     dsn=settings.sentry_dsn,
+<<<<<<< HEAD
                     project_slug=TEST_PROJECT_NAME,
+=======
+                    project_slug=TEST_PROJECT_NAME
+>>>>>>> 438fae9 (refactor: use pydandic settings to handle configuration)
                 ),
             }
         else:
@@ -131,9 +138,13 @@ def create_graphql_json_object(**kwargs):
     if kwargs["dsn_mr_state"]:
         dsn_mr = {
             "id": "gid://gitlab/MergeRequest/0001",
+<<<<<<< HEAD
             "title": settings.dsn_mr_title.format(
                 project_name=response_dict["node"]["name"]
             ),
+=======
+            "title": settings.dsn_mr_title.format(project_name=response_dict["node"]["name"]),
+>>>>>>> 438fae9 (refactor: use pydandic settings to handle configuration)
             "state": kwargs["dsn_mr_state"],
         }
         response_dict["node"]["mergeRequests"]["nodes"].append(dsn_mr)
@@ -350,38 +361,3 @@ def payload_sentry_project():
         sentryclirc_mr_state="merged",
         dsn_mr_state="merged",
     )
-
-
-GRAPHQL_TEST_QUERY = {
-    "name": "TEST_QUERY",
-    "instance": "projects",
-    "body": """
-{
-    project(fullPath: "none") {
-        id
-        fullPath
-        name
-        createdAt
-        mergeRequestsEnabled
-        group {
-            name
-        }
-        repository {
-            blobs {
-                nodes {
-                    name
-                    rawTextBlob
-                }
-            }
-        }
-        mergeRequests {
-            nodes {
-                id
-                title
-                state
-            }
-        }
-    }
-}
-""",
-}
