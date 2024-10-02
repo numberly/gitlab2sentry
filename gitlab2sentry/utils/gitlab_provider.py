@@ -16,7 +16,9 @@ from gitlab2sentry.resources import G2SProject, settings
 
 class GraphQLClient:
     def __init__(
-        self, url: Optional[str] = settings.gitlab_url, token: Optional[str] = settings.gitlab_token
+        self,
+        url: Optional[str] = settings.gitlab_url,
+        token: Optional[str] = settings.gitlab_token,
     ):
         self._client = Client(
             transport=self._get_transport(url, token),
@@ -81,7 +83,9 @@ class GraphQLClient:
 
 class GitlabProvider:
     def __init__(
-        self, url: Optional[str] = settings.gitlab_url, token: Optional[str] = settings.gitlab_token
+        self,
+        url: Optional[str] = settings.gitlab_url,
+        token: Optional[str] = settings.gitlab_token,
     ) -> None:
         self.gitlab = self._get_gitlab(url, token)
         self._gql_client = GraphQLClient(url, token)
@@ -98,7 +102,9 @@ class GitlabProvider:
 
     def _get_update_limit(self) -> Optional[datetime]:
         if settings.gitlab_project_creation_limit:
-            return datetime.now() - timedelta(days=settings.gitlab_project_creation_limit)
+            return datetime.now() - timedelta(
+                days=settings.gitlab_project_creation_limit
+            )
         else:
             return None
 
@@ -181,16 +187,21 @@ class GitlabProvider:
                     full_path,
                 )
             )
-            f = project.files.create(
-                {
-                    "author_email": settings.gitlab_author_email,
-                    "author_name": settings.gitlab_author_name,
-                    "branch": branch_name,
-                    "commit_message": settings.sentryclirc_com_msg,
-                    "content": content,
-                    "file_path": file_path,
-                }
-            )
+            data = {
+                "author_email": settings.gitlab_author_email,
+                "author_name": settings.gitlab_author_name,
+                "branch": branch_name,
+                "commit_message": settings.sentryclirc_com_msg,
+                "content": content,
+                "file_path": file_path,
+            }
+            # When commit signing is enabled in GitLab (e.g. via pre-hook),
+            # commit requires that the author information matches the signer identity
+            # https://gitlab.com/gitlab-org/gitlab/-/merge_requests/150855
+            if settings.gitlab_signed_commit:
+                data.pop("author_email")
+                data.pop("author_name")
+            f = project.files.create(data=data)
 
     def _get_default_mentions(self, project: Project) -> str:
         return ", ".join(
