@@ -1,9 +1,8 @@
 from collections import namedtuple
 from typing import List, Tuple
+
 from pydantic import Field
 from pydantic_settings import BaseSettings
-
-
 
 
 class Settings(BaseSettings):
@@ -36,6 +35,7 @@ class Settings(BaseSettings):
     gitlab_mr_label_list: List[str] = Field(["sentry"])
     gitlab_project_creation_limit: int = Field(30)
     gitlab_rmv_src_branch: bool = Field(True)
+    gitlab_signed_commit: bool = Field(False)
     gitlab_token: str = Field("default-token")
     gitlab_url: str = Field("http://default-gitlab-url")
     sentry_dsn: str = Field("http://default.sentry.com")

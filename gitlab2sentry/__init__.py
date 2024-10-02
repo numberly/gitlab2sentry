@@ -6,7 +6,13 @@ from typing import Any, Dict, List, Optional
 from slugify import slugify
 
 from gitlab2sentry.exceptions import SentryProjectCreationFailed
-from gitlab2sentry.resources import settings, G2SProject, G2S_STATS, GRAPHQL_LIST_PROJECTS_QUERY, GRAPHQL_FETCH_PROJECT_QUERY
+from gitlab2sentry.resources import (
+    G2S_STATS,
+    GRAPHQL_FETCH_PROJECT_QUERY,
+    GRAPHQL_LIST_PROJECTS_QUERY,
+    G2SProject,
+    settings,
+)
 from gitlab2sentry.utils import GitlabProvider, SentryProvider
 
 logging.basicConfig(
@@ -31,7 +37,9 @@ class Gitlab2Sentry:
         return GitlabProvider(settings.gitlab_url, settings.gitlab_token)
 
     def _get_sentry_provider(self) -> SentryProvider:
-        return SentryProvider(settings.sentry_url, settings.sentry_token, settings.sentry_org_slug)
+        return SentryProvider(
+            settings.sentry_url, settings.sentry_token, settings.sentry_org_slug
+        )
 
     def _ensure_sentry_group(self, name: str) -> None:
         if name not in self.sentry_groups:
@@ -108,7 +116,9 @@ class Gitlab2Sentry:
                 ):
                     if not (sentryclirc_mr_state and sentryclirc_mr_state == "opened"):
                         sentryclirc_mr_state = mr["state"]
-                elif mr["title"] == settings.dsn_mr_title.format(project_name=project_name):
+                elif mr["title"] == settings.dsn_mr_title.format(
+                    project_name=project_name
+                ):
                     if not (dsn_mr_state and dsn_mr_state == "opened"):
                         dsn_mr_state = mr["state"]
                 else:
@@ -230,7 +240,7 @@ class Gitlab2Sentry:
         full_path: str,
         sentry_group_name: str,
         sentry_project_name: str,
-        sentry_project_slug: str
+        sentry_project_slug: str,
     ) -> Optional[Dict[str, Any]]:
         try:
             return self.sentry_provider.get_or_create_project(
@@ -256,7 +266,7 @@ class Gitlab2Sentry:
         self,
         g2s_project: G2SProject,
         sentry_group_name: str,
-        custom_name: Optional[str] = None
+        custom_name: Optional[str] = None,
     ) -> bool:
         """
         Creates sentry project for all given gitlab projects. It
@@ -304,7 +314,7 @@ class Gitlab2Sentry:
                     g2s_project.full_path,
                     sentry_group_name,
                     sentry_project_name,
-                    sentry_project_slug
+                    sentry_project_slug,
                 )
 
                 # If Sentry fails to create project skip
@@ -348,9 +358,7 @@ class Gitlab2Sentry:
         return False
 
     def update(
-        self,
-        full_path: Optional[str] = None,
-        custom_name: Optional[str] = None
+        self, full_path: Optional[str] = None, custom_name: Optional[str] = None
     ) -> None:
         """
         args: full_path
@@ -372,7 +380,7 @@ class Gitlab2Sentry:
             if g2s_project:
                 sentry_group_name = g2s_project.group.split("/")[0].strip()
                 self._handle_g2s_project(
-                    g2s_project, sentry_group_name, custom_name # type: ignore
+                    g2s_project, sentry_group_name, custom_name  # type: ignore
                 )
             else:
                 logging.info(
