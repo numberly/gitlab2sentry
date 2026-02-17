@@ -22,7 +22,7 @@ class GraphQLClient:
     ):
         self._client = Client(
             transport=self._get_transport(url, token),
-            fetch_schema_from_transport=True,
+            fetch_schema_from_transport=False,
             execute_timeout=settings.gitlab_graphql_timeout,
         )
         websockets_logger.setLevel(logging.WARNING)
